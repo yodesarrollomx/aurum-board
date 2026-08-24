@@ -1350,6 +1350,67 @@ body{padding-top:env(safe-area-inset-top)}
   iniciar();
 })();
 </script>
+<!-- Sala de Edición: si la revisión de HOY sigue sin puntuar, se pide la decisión
+     al ENTRAR al embudo (mismo patrón que los post-its de MOAC). La liga y la
+     clave de la Sala ya viven en localStorage (mismo origen); si no están, no
+     se muestra nada y este bloque no toca ningún dato del tablero. -->
+<style>
+  #salaDecVelo{position:fixed;inset:0;z-index:9000;background:rgba(23,20,15,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px}
+  #salaDecVelo[hidden]{display:none}
+  .sala-dec{max-width:430px;width:100%;background:#F6EFC9;color:#17140F;border-radius:6px;padding:26px 26px 20px;box-shadow:0 18px 50px rgba(0,0,0,.45);transform:rotate(-.6deg);font-family:'Helvetica Neue',Arial,sans-serif}
+  .sala-dec .k{font:700 11px/1 'Helvetica Neue',Arial,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#8a6d2f;margin:0 0 10px}
+  .sala-dec h2{font-size:20px;line-height:1.25;margin:0 0 8px}
+  .sala-dec p{font-size:13.5px;line-height:1.5;margin:0 0 16px;color:#4a4232}
+  .sala-dec .acciones{display:flex;gap:10px;flex-wrap:wrap}
+  .sala-dec a,.sala-dec button{flex:1 1 auto;text-align:center;font:600 13.5px 'Helvetica Neue',Arial,sans-serif;padding:11px 14px;border-radius:8px;cursor:pointer;text-decoration:none}
+  .sala-dec a{background:#B98B3C;color:#17140F;border:1px solid #B98B3C}
+  .sala-dec button{background:none;border:1px solid #b7a97f;color:#4a4232}
+  #salaDecChip{position:fixed;right:16px;bottom:16px;z-index:8990;background:#F6EFC9;color:#17140F;border:1px solid #B98B3C;border-radius:999px;padding:9px 15px;font:600 12.5px 'Helvetica Neue',Arial,sans-serif;box-shadow:0 8px 22px rgba(0,0,0,.35);cursor:pointer}
+  #salaDecChip[hidden]{display:none}
+</style>
+<div id="salaDecVelo" hidden role="dialog" aria-modal="true" aria-labelledby="salaDecTit">
+  <div class="sala-dec">
+    <p class="k">Sala de Edición · decisión del día</p>
+    <h2 id="salaDecTit">Antes de las métricas, Alejandro:</h2>
+    <p id="salaDecTxt">La revisión de hoy sigue sin puntuar.</p>
+    <div class="acciones">
+      <a href="https://alexpueblag.github.io/sala-edicion/" id="salaDecIr">Puntuar ahora</a>
+      <button type="button" id="salaDecLuego">Al rato</button>
+    </div>
+  </div>
+</div>
+<button id="salaDecChip" hidden type="button">🎬 Sala: revisión de hoy pendiente</button>
+<script>
+(function(){
+  'use strict';
+  var gas='',clave='';
+  try{gas=localStorage.getItem('sala_gas')||'';clave=localStorage.getItem('sala_clave')||'';}catch(e){}
+  if(!gas||!clave)return;
+  var SNOOZE='sala_dec_luego';
+  function velo(){return document.getElementById('salaDecVelo');}
+  function chip(){return document.getElementById('salaDecChip');}
+  function abrir(txt){var v=velo();document.getElementById('salaDecTxt').textContent=txt;v.hidden=false;}
+  function aChip(){velo().hidden=true;chip().hidden=false;}
+  function pendiente(j){
+    if(!j||j.error||!Array.isArray(j.propuestas)||!j.propuestas.length)return null;
+    var dec=j.decisiones||{};
+    if(dec.guardado)return null;                     // ya enviaste la revisión de hoy
+    var laminas=0;j.propuestas.forEach(function(p){laminas+=(p.laminas&&p.laminas.length)||0;if(p.tipo==='eje')laminas++;});
+    return {props:j.propuestas.length,laminas:laminas};
+  }
+  fetch(gas+'?recurso=dia&clave='+encodeURIComponent(clave),{credentials:'omit'})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      var p=pendiente(j);if(!p)return;
+      var txt='La Sala montó '+p.props+(p.props===1?' propuesta':' propuestas')+
+        (p.laminas?' ('+p.laminas+' láminas)':'')+' y espera tu puntuación de hoy. Sin tu revisión, la producción de mañana no arranca.';
+      var luego=false;try{luego=sessionStorage.getItem(SNOOZE)==='1';}catch(e){}
+      if(luego){chip().hidden=false;}else abrir(txt);
+      document.getElementById('salaDecLuego').addEventListener('click',function(){try{sessionStorage.setItem(SNOOZE,'1');}catch(e){}aChip();});
+      chip().addEventListener('click',function(){chip().hidden=true;abrir(txt);});
+    }).catch(function(){});
+})();
+</script>
 <!-- Portero YOD: liga mágica / clave de equipo / Google + bitácora -->
 <script src="https://alexpueblag.github.io/potenciales-yod/portero.js?v=credomit"></script>
 <script src="https://alexpueblag.github.io/yod-portal/os/shell.js"></script>
