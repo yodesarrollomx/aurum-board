@@ -256,7 +256,7 @@
 [data-tema="oscuro"]{--negro:#F1EDE3;--crema:#17140F;--arena:#231d14;--sup:#211b12;--piedra:#9A9182;--carbon:#b3a892;--linea:rgba(241,237,227,.12);--oro:#B98B3C;--tinta:#F1EDE3;--verde:#8FBF8B;--amar:#D9A45B;--rojo:#E0605A;--oro-texto:#B98B3C;--sobre-estado:#17140F;}
 [data-tema="oscuro"] body{background:var(--crema)!important;color:var(--negro);color-scheme:dark;}
 </style>
-<link rel="stylesheet" href="https://alexpueblag.github.io/yod-portal/os/shell.css">
+<link rel="stylesheet" href="https://tableros.yodesarrollo.mx/yod-portal/os/shell.css">
 <style id="yod-metamorf">
 /* Métricas con la cara YOD OS: header y contenido dentro del lienzo crema */
 .yod-canvas{padding:0 30px;background:var(--crema);color:var(--negro)}
@@ -312,7 +312,7 @@ body{padding-top:env(safe-area-inset-top)}
   function credencial(){ try{return window.__PYOD_BOOT||localStorage.getItem(PORTERO_LSK)||"";}catch(e){return window.__PYOD_BOOT||"";} }
   var PYOD_EXEC="https://script.google.com/macros/s/AKfycbwlDDCWWzOWYZsUpBU9uqsQ7aenQ469PF6s6FkNlBFS1_cJSU5njG9oQmuyELy5zlqzFg/exec";
   function _pyodCerrar(){ var n=0; try{n=parseInt(sessionStorage.getItem("pyod_recargas")||"0",10)||0;}catch(e){} try{localStorage.removeItem(PORTERO_LSK);sessionStorage.removeItem("pyod_rol");}catch(e){} if(n>=1)return; /* tope anti-bucle: máximo 1 recarga por sesión */ try{sessionStorage.setItem("pyod_recargas",String(n+1));}catch(e){} location.reload(); }
-  function _pyodAviso(){ if(document.getElementById("pyodAviso"))return; var d=document.createElement("div");d.id="pyodAviso";d.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,92vw);background:#221E17;color:#F1EDE3;border:1px solid rgba(255,255,255,.14);border-left:3px solid #B98B3C;border-radius:12px;padding:14px 16px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 18px 48px rgba(0,0,0,.5)";d.innerHTML='<b style=\"color:#B98B3C\">Tu sesión es válida.</b> Este tablero no validó tu acceso: su backend (Apps Script) necesita re-desplegarse. Tu sesión NO se cerró. <a href=\"https://alexpueblag.github.io/yod-portal/os/\" style=\"color:#B98B3C\">Volver a YOD OS</a> · <button id=\"pyodAvX\" style=\"background:none;border:0;color:#9A9182;cursor:pointer;text-decoration:underline;font:inherit\">Ocultar</button>';document.body.appendChild(d);var x=document.getElementById("pyodAvX");if(x)x.onclick=function(){d.remove();}; }
+  function _pyodAviso(){ if(document.getElementById("pyodAviso"))return; var d=document.createElement("div");d.id="pyodAviso";d.style.cssText="position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,92vw);background:#221E17;color:#F1EDE3;border:1px solid rgba(255,255,255,.14);border-left:3px solid #B98B3C;border-radius:12px;padding:14px 16px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 18px 48px rgba(0,0,0,.5)";d.innerHTML='<b style=\"color:#B98B3C\">Tu sesión es válida.</b> Este tablero no validó tu acceso: su backend (Apps Script) necesita re-desplegarse. Tu sesión NO se cerró. <a href=\"https://tableros.yodesarrollo.mx/yod-portal/os/\" style=\"color:#B98B3C\">Volver a YOD OS</a> · <button id=\"pyodAvX\" style=\"background:none;border:0;color:#9A9182;cursor:pointer;text-decoration:underline;font:inherit\">Ocultar</button>';document.body.appendChild(d);var x=document.getElementById("pyodAvX");if(x)x.onclick=function(){d.remove();}; }
   /* ANTI-LOOP (agosto 2026): el dominio suspendido contesta "liga" a la clave del
      portero de respaldo aunque la sesión sea válida. Ya no se recarga ni se cierra
      la sesión por eso: solo se avisa, y actualizarTodo cae al respaldo local. */
@@ -336,7 +336,7 @@ body{padding-top:env(safe-area-inset-top)}
     recientes:[]
   };
 
-  /* Arquitectura de Autor = EXPERIENCIA AURUM (alexpueblag.github.io/aurum-experiencia),
+  /* Arquitectura de Autor = EXPERIENCIA AURUM (tableros.yodesarrollo.mx/aurum-experiencia),
      el cuestionario web. Aclaración que costó confundirse varias veces: lo que Alejandro
      retiró el 2026-07-22 fue el GOOGLE FORM viejo ("Cuestionario Arquitectónico", hoja
      FORM - QAA), que es OTRA cosa y este tablero nunca leyó. Auditado el 29-jul-2026:
@@ -743,8 +743,8 @@ body{padding-top:env(safe-area-inset-top)}
     if(!F.mag){ try{F.mag=localStorage.getItem('aurum_mag_v1')||'pot';}catch(e){F.mag='pot';} }   /* default = Plan de Potencial (imán actual) y recuerda tu última elección */
     var mag=F.mag;
     var MAGCFG={
-      arq:{titulo:'Arquitectura de Autor',fuenteSuf:'(del Sheet)',abren:'que abren la página',empiezan:'empiezan el cuestionario',entrada:'El embudo arranca en la <b>1ª página</b> del formulario (Estilo = la entrada) y cada barra es una página del cuestionario.',verUrl:'https://alexpueblag.github.io/aurum-experiencia/',verTxt:'Ver el cuestionario →'},
-      pot:{titulo:'Plan de Potencial',fuenteSuf:'(medido directo en el servidor · no se pierde con bloqueadores de iPhone)',abren:'que abren el formulario (portada)',empiezan:'empiezan a contestar (1er paso)',entrada:'El embudo arranca en el <b>1er paso</b> (Objetivo = la entrada) y cada barra es un paso del formulario; la portada y las visitas van arriba.',verUrl:'https://alexpueblag.github.io/plan-potencial/',verTxt:'Ver el formulario →'}
+      arq:{titulo:'Arquitectura de Autor',fuenteSuf:'(del Sheet)',abren:'que abren la página',empiezan:'empiezan el cuestionario',entrada:'El embudo arranca en la <b>1ª página</b> del formulario (Estilo = la entrada) y cada barra es una página del cuestionario.',verUrl:'https://tableros.yodesarrollo.mx/aurum-experiencia/',verTxt:'Ver el cuestionario →'},
+      pot:{titulo:'Plan de Potencial',fuenteSuf:'(medido directo en el servidor · no se pierde con bloqueadores de iPhone)',abren:'que abren el formulario (portada)',empiezan:'empiezan a contestar (1er paso)',entrada:'El embudo arranca en el <b>1er paso</b> (Objetivo = la entrada) y cada barra es un paso del formulario; la portada y las visitas van arriba.',verUrl:'https://tableros.yodesarrollo.mx/plan-potencial/',verTxt:'Ver el formulario →'}
     };
     var cfg=MAGCFG[mag]||MAGCFG.arq;
     function magTab(id,lbl,sub){ var on=mag===id; return '<button onclick="embSet(&#39;mag&#39;,&#39;'+id+'&#39;)" style="flex:1;min-width:160px;text-align:left;cursor:pointer;border:1px solid '+(on?'var(--oro)':'var(--linea)')+';background:'+(on?'var(--oro-fill)':'#16161a')+';color:'+(on?'var(--sobre-fill)':'var(--crema-fija)')+';border-radius:9px;padding:9px 14px;transition:.12s;">'+
@@ -1260,7 +1260,7 @@ body{padding-top:env(safe-area-inset-top)}
     /* ---- generador de link con UTM para la proxima publicacion (FB en el texto, IG en el 1er comentario) ---- */
     /* ÚNICO lugar donde vive el dominio público de los imanes. Cambiar aquí al migrar
        a plan.yodesarrollo.mx / cuestionario.yodesarrollo.mx y todo el board lo hereda. */
-    var LG_DEST={pot:'https://yodesarrollo.github.io/plan-potencial/',cuest:'https://alexpueblag.github.io/aurum-experiencia/'};
+    var LG_DEST={pot:'https://yodesarrollo.github.io/plan-potencial/',cuest:'https://tableros.yodesarrollo.mx/aurum-experiencia/'};
     var LG_FUENTE={fb:'facebook',ig:'instagram'};
     /* utm_content: minusculas, sin acentos ni espacios — asi entra limpio al Sheet */
     function lgSlug(s){
@@ -1374,7 +1374,7 @@ body{padding-top:env(safe-area-inset-top)}
     <h2 id="salaDecTit">Antes de las métricas, Alejandro:</h2>
     <p id="salaDecTxt">La revisión de hoy sigue sin puntuar.</p>
     <div class="acciones">
-      <a href="https://alexpueblag.github.io/sala-edicion/" id="salaDecIr">Puntuar ahora</a>
+      <a href="https://tableros.yodesarrollo.mx/sala-edicion/" id="salaDecIr">Puntuar ahora</a>
       <button type="button" id="salaDecLuego">Al rato</button>
     </div>
   </div>
@@ -1412,7 +1412,7 @@ body{padding-top:env(safe-area-inset-top)}
 })();
 </script>
 <!-- Portero YOD: liga mágica / clave de equipo / Google + bitácora -->
-<script src="https://alexpueblag.github.io/potenciales-yod/portero.js?v=credomit"></script>
-<script src="https://alexpueblag.github.io/yod-portal/os/shell.js"></script>
+<script src="https://tableros.yodesarrollo.mx/potenciales-yod/portero.js?v=credomit"></script>
+<script src="https://tableros.yodesarrollo.mx/yod-portal/os/shell.js"></script>
 </body>
 </html>
