@@ -336,7 +336,7 @@ body{padding-top:env(safe-area-inset-top)}
     recientes:[]
   };
 
-  /* Arquitectura de Autor = EXPERIENCIA AURUM (yodesarrollomx.github.io/aurum-experiencia),
+  /* Arquitectura de Autor = EXPERIENCIA AURUM (aurumarquitectos.github.io/experiencia),
      el cuestionario web. Aclaración que costó confundirse varias veces: lo que Alejandro
      retiró el 2026-07-22 fue el GOOGLE FORM viejo ("Cuestionario Arquitectónico", hoja
      FORM - QAA), que es OTRA cosa y este tablero nunca leyó. Auditado el 29-jul-2026:
@@ -743,7 +743,7 @@ body{padding-top:env(safe-area-inset-top)}
     if(!F.mag){ try{F.mag=localStorage.getItem('aurum_mag_v1')||'pot';}catch(e){F.mag='pot';} }   /* default = Plan de Potencial (imán actual) y recuerda tu última elección */
     var mag=F.mag;
     var MAGCFG={
-      arq:{titulo:'Arquitectura de Autor',fuenteSuf:'(del Sheet)',abren:'que abren la página',empiezan:'empiezan el cuestionario',entrada:'El embudo arranca en la <b>1ª página</b> del formulario (Estilo = la entrada) y cada barra es una página del cuestionario.',verUrl:'https://yodesarrollomx.github.io/aurum-experiencia/',verTxt:'Ver el cuestionario →'},
+      arq:{titulo:'Arquitectura de Autor',fuenteSuf:'(del Sheet)',abren:'que abren la página',empiezan:'empiezan el cuestionario',entrada:'El embudo arranca en la <b>1ª página</b> del formulario (Estilo = la entrada) y cada barra es una página del cuestionario.',verUrl:'https://aurumarquitectos.github.io/experiencia/',verTxt:'Ver el cuestionario →'},
       pot:{titulo:'Plan de Potencial',fuenteSuf:'(medido directo en el servidor · no se pierde con bloqueadores de iPhone)',abren:'que abren el formulario (portada)',empiezan:'empiezan a contestar (1er paso)',entrada:'El embudo arranca en el <b>1er paso</b> (Objetivo = la entrada) y cada barra es un paso del formulario; la portada y las visitas van arriba.',verUrl:'https://yodesarrollomx.github.io/plan-potencial/',verTxt:'Ver el formulario →'}
     };
     var cfg=MAGCFG[mag]||MAGCFG.arq;
@@ -1260,7 +1260,7 @@ body{padding-top:env(safe-area-inset-top)}
     /* ---- generador de link con UTM para la proxima publicacion (FB en el texto, IG en el 1er comentario) ---- */
     /* ÚNICO lugar donde vive el dominio público de los imanes. Cambiar aquí al migrar
        a plan.yodesarrollo.mx / cuestionario.yodesarrollo.mx y todo el board lo hereda. */
-    var LG_DEST={pot:'https://yodesarrollomx.github.io/plan-potencial/',cuest:'https://yodesarrollomx.github.io/aurum-experiencia/'};
+    var LG_DEST={pot:'https://yodesarrollomx.github.io/plan-potencial/',cuest:'https://aurumarquitectos.github.io/experiencia/'};
     var LG_FUENTE={fb:'facebook',ig:'instagram'};
     /* utm_content: minusculas, sin acentos ni espacios — asi entra limpio al Sheet */
     function lgSlug(s){

@@ -24,7 +24,7 @@ CASA_VIEJA = "https://alexpueblag.github.io"
 TARGETS = [
     {"n": "Pagina · Plan de Potencial", "url": CASA_NUEVA + "/plan-potencial/",
      "need": "Despierta tu Terreno", "espera": "directo"},
-    {"n": "Pagina · Cuestionario", "url": CASA_NUEVA + "/aurum-experiencia/",
+    {"n": "Pagina · Cuestionario", "url": "https://aurumarquitectos.github.io/experiencia/",  # 2-sep: vive en la org de Aurum
      "need": "Arquitectura de Autor", "espera": "directo"},
     {"n": "Pagina · Board", "url": CASA_NUEVA + "/aurum-board/",
      "need": "Tablero · Yo Desarrollo", "espera": "directo"},
@@ -48,6 +48,9 @@ TARGETS = [
      "espera": "cualquiera", "hacia": CASA_NUEVA},
     {"n": "Cascaron · Cuestionario", "url": CASA_VIEJA + "/aurum-experiencia/",
      "espera": "cualquiera", "hacia": CASA_NUEVA},
+    # 2-sep: la casa yodesarrollomx del cuestionario tambien quedo de cascaron (reenvía a Aurum).
+    {"n": "Cascaron 2 · Cuestionario", "url": CASA_NUEVA + "/aurum-experiencia/",
+     "espera": "cualquiera", "hacia": "https://aurumarquitectos.github.io"},
     {"n": "Cascaron · Board", "url": CASA_VIEJA + "/aurum-board/",
      "espera": "cualquiera", "hacia": CASA_NUEVA},
 ]
