@@ -12,7 +12,7 @@ sitio para clientes (`README.md`). Título de la pestaña: "Tablero · Yo Desarr
 - **En vivo:** `https://yodesarrollomx.github.io/aurum-board/` — **HTTP 200**, comprobado con
   `curl -L` el **2026-09-04**.
 - **Casa vieja (cascarón que reenvía):** `https://alexpueblag.github.io/aurum-board/` — 200,
-  mismo día. Declarado como cascarón en `scripts/guardian_uptime.py:56`.
+  mismo día. Declarado como cascarón en `scripts/guardian_uptime.py:54`.
 - **`https://tableros.yodesarrollo.mx/aurum-board/` NO responde** (curl = `000`, sin DNS,
   2026-09-04). Varias memorias todavía escriben esa dirección: es la casa futura, no la de hoy.
 - **Repo:** `https://github.com/yodesarrollomx/aurum-board.git` (`git remote -v`). Clon local
@@ -23,10 +23,9 @@ sitio para clientes (`README.md`). Título de la pestaña: "Tablero · Yo Desarr
 ## Reglas INVIOLABLES
 
 1. **SIEMPRE `git pull --rebase` antes de empujar.** Una GitHub Action commitea sola cada
-   hora (`.github/workflows/refresh-board.yml`, cron `0 * * * *`): 24 commits "Actualizar
-   metricas (Action …)" en los últimos 7 días. Prueba de hoy: el clon local iba **12 commits
-   atrás de `origin/main`** (`git rev-list --count HEAD..origin/main` = 12, 2026-09-04).
-   Empujar sin rebase = conflicto o pisar el refresco.
+   hora (`.github/workflows/refresh-board.yml`, cron `0 * * * *`), así que el clon local casi
+   nunca está al día. Corre `git rev-list --count HEAD..origin/main` antes de empujar: casi
+   nunca es 0. Empujar sin rebase = conflicto o pisar el refresco.
 2. **No editar `metrics.json` ni `covers/` a mano.** Son generados por
    `scripts/pull_metrics.py`; la Action los pisa en la siguiente corrida y ante conflicto
    manda lo recién jalado (`refresh-board.yml`, `git rebase -X ours`).
@@ -55,8 +54,9 @@ sitio para clientes (`README.md`). Título de la pestaña: "Tablero · Yo Desarr
   `CONFIG` (líneas 300-310), el Portero, el `SNAP`/`PAUSA`, el render de todas las secciones
   y el generador de ligas UTM.
 - `metrics.json` — foto de las publicaciones FB/IG (posts, reach, ER, portadas). La escribe
-  `scripts/pull_metrics.py`. Última generación al leerlo hoy: `"generado": "2026-09-02 07:17"`.
-- `covers/` — 88 portadas .jpg comprimidas de los posts (`ls covers | wc -l` = 88).
+  `scripts/pull_metrics.py`. Para saber de cuándo es la foto: `grep generado metrics.json`.
+- `covers/` — las portadas .jpg comprimidas de los posts; las escribe `scripts/pull_metrics.py`
+  y crecen solas con cada corrida de la Action, así que el conteo cambia todos los días.
 - `datos.json` — respaldo empacado de la última foto real del Sheet; se usa solo si el
   backend no contesta (`index.html:451`).
 - `metrics_history.jsonl` — histórico local; está en `.gitignore` a propósito (no se versiona
@@ -65,7 +65,7 @@ sitio para clientes (`README.md`). Título de la pestaña: "Tablero · Yo Desarr
   del repo (`BASE = parents[1]`, línea 20). Si existe `AURUM_QAA_TOKEN`, además pide
   `?recurso=leads` al backend del cuestionario para atribuir leads por post (líneas 33-37).
 - `scripts/guardian_uptime.py` — vigila que páginas y backends de los formularios respondan
-  (lista `TARGETS`, líneas 24-57). Abre y cierra issues de GitHub solo.
+  (lista `TARGETS`, líneas 24-56). Abre y cierra issues de GitHub solo.
 - `scripts/guardian_salud.py` (corrida exitosa reciente) y `scripts/guardian_token.py` (token
   vivo) — los otros dos vigilantes; avisan por issue de GitHub.
 - `.github/workflows/` — 4 workflows: `refresh-board.yml` (cada hora), `guardian-uptime.yml`
@@ -151,8 +151,9 @@ barrido de la memoria [[barrido-backends-1ago]].
 - **11 leads NUEVO sin tocar +24h** — dueño: Alejandro. Alerta roja en `datos.json`
   (prometió estimado en <24h). Evidencia: que la alerta desaparezca del tablero.
 - **Día del corte del DNS** — dueño: Alejandro / Miguel Reina (cPanel). Cuando exista
-  `tableros.yodesarrollo.mx`, hay que cambiar los tres "Cascaron" de
-  `scripts/guardian_uptime.py:47-57` de `espera:"cualquiera"` a `"reenvio"`. Evidencia: curl
+  `tableros.yodesarrollo.mx`, hay que cambiar las entradas "Cascaron" de
+  `TARGETS` en `scripts/guardian_uptime.py` (hoy son cuatro, líneas 47-55) de
+  `espera:"cualquiera"` a `"reenvio"`. Evidencia: curl
   al dominio nuevo devolviendo 200.
 
 ## Por confirmar (NO afirmar sin preguntar)
