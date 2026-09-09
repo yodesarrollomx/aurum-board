@@ -310,6 +310,18 @@ body{padding-top:env(safe-area-inset-top)}
     METRICS_URL: "metrics.json",   /* metricas de publicaciones (lo genera pull_metrics.py) */
     POT_URL: "https://script.google.com/macros/s/AKfycbw3EB-6Q9Mq-ouDU-JvKMrRUaw4auYVeGkKja783yJ7_dEpCOW8xoMhs8IQMDojmlDB3A/exec"   /* Apps Script del formulario Plan de Potencial (imán 'pot') — su propio ?recurso=board */
   };
+  /* Canales del embudo. La clave corta es la que entiende el rebote (ver
+     public/r/index.html del repo aurumarquitectos.github.io); el texto es lo
+     que se lee aquí. "Otro…" abre un campo libre: un canal que no esté en esta
+     lista igual se mide, sin tocar código ni volver a desplegar nada. */
+  var LG_CANALES=[["fb","Facebook"],["ig","Instagram"],["tt","TikTok"],["yt","YouTube"],
+    ["li","LinkedIn"],["wa","WhatsApp"],["em","Correo"],["qr","QR impreso"],
+    ["we","Sitio web"],["go","Google"],["otro","Otro…"]];
+  var LG_OPCIONES=LG_CANALES.map(function(c){return '<option value="'+c[0]+'">'+c[1]+'</option>';}).join("");
+  /* Canales que por naturaleza viven meses (no son una publicación de un día):
+     al elegirlos se marca "sin fecha" solo. */
+  var LG_PERMANENTES={qr:1,em:1,wa:1,we:1};
+
   var PORTERO_LSK="pyod_clave_v1";   /* credencial que escribe portero.js */
   function credencial(){ try{return window.__PYOD_BOOT||localStorage.getItem(PORTERO_LSK)||"";}catch(e){return window.__PYOD_BOOT||"";} }
   var PYOD_EXEC="https://script.google.com/macros/s/AKfycbwlDDCWWzOWYZsUpBU9uqsQ7aenQ469PF6s6FkNlBFS1_cJSU5njG9oQmuyELy5zlqzFg/exec";
@@ -1178,19 +1190,22 @@ body{padding-top:env(safe-area-inset-top)}
         '</div></div>';
     }
     /* ---- generador de link medible (herramienta, no alarma: antes iba en caja roja de advertencia) ---- */
-    h+='<div class="toolbox"><div class="tt">🎯 Link medible para tu próxima publicación</div><span class="tx">Genera el link aquí y pégalo en la publicación: el board te dirá <b>cuántos leads trajo</b>. En Facebook va en el texto del post; en Instagram va en el <b>primer comentario</b> (Instagram no hace clicable el link del caption).'+
+    var ic='padding:8px 10px;border:1px solid var(--linea);border-radius:9px;font-size:12px;background:var(--crema);color:var(--negro);';
+    h+='<div class="toolbox"><div class="tt">🎯 Link medible — para cualquier canal</div><span class="tx">Genera el link aquí y pégalo donde lo vayas a usar: el board te dirá <b>cuántos leads trajo cada uno</b>. En Facebook va en el texto del post; en Instagram va en el <b>primer comentario</b> (Instagram no hace clicable el link del caption).'+
       '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:9px;">'+
-        '<select id="lgRed" onchange="genLinkFB()" style="padding:8px 10px;border:1px solid var(--linea);border-radius:9px;font-size:12px;background:var(--crema);color:var(--negro);">'+
-          '<option value="fb">Facebook</option><option value="ig">Instagram</option>'+
-        '</select>'+
-        '<select id="lgDest" onchange="genLinkFB()" style="padding:8px 10px;border:1px solid var(--linea);border-radius:9px;font-size:12px;background:var(--crema);color:var(--negro);">'+
+        '<select id="lgRed" onchange="genLinkFB(true)" style="'+ic+'">'+LG_OPCIONES+'</select>'+
+        '<input id="lgCanal" oninput="genLinkFB()" placeholder="nombre del canal" style="display:none;max-width:130px;'+ic+'">'+
+        '<select id="lgDest" onchange="genLinkFB()" style="'+ic+'">'+
           '<option value="pot">Plan de Potencial</option><option value="cuest">Cuestionario</option>'+
         '</select>'+
-        '<input id="lgPieza" oninput="genLinkFB()" placeholder="pieza (ej. semana-ppp-pub1)" style="min-width:170px;padding:8px 10px;border:1px solid var(--linea);border-radius:9px;font-size:12px;background:var(--crema);color:var(--negro);">'+
+        '<input id="lgPieza" oninput="genLinkFB()" placeholder="pieza (ej. semana-ppp-pub1)" style="min-width:170px;'+ic+'">'+
+        '<label id="lgFijaBox" style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--carbon);cursor:pointer;" title="Para lo que vive meses y recibe tráfico todos los días: un QR en una lona, la firma del correo, el link del perfil. Con fecha pasaría por publicación de ese día y ensuciaría esa campaña.">'+
+          '<input type="checkbox" id="lgFija" onchange="genLinkFB()"> sin fecha</label>'+
         '<input id="lgUrl" readonly onclick="this.select()" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid var(--linea);border-radius:9px;font-size:11.5px;background:#0f0f12;color:var(--apagado-osc);font-family:JetBrains Mono,monospace;">'+
         '<button class="chipbtn on" onclick="copiarLinkFB()" style="min-height:36px;">Copiar</button>'+
+        '<button class="chipbtn" onclick="qrImprimir()" style="min-height:36px;" title="Abre una hoja lista para imprimir con el QR de este mismo link — se mide igual que si lo hubieran tecleado">QR para imprimir</button>'+
       '</div>'+
-      '<div style="font-size:11px;color:var(--piedra);margin-top:6px;">Genera el link el mismo día que publicas (la fecha va dentro de la campaña); para un post ya publicado usa el generador dentro de su ficha. La <b>pieza</b> es opcional y sirve para distinguir publicaciones de una misma serie. Los leads pueden tardar hasta 48 h en aparecer.</div>'+
+      '<div id="lgAyuda" style="font-size:11px;color:var(--piedra);margin-top:6px;"></div>'+
     '</span></div>';
     /* ---- KPIs de cuenta (referencia, de-enfatizados) ---- */
     h+='<div class="kref"><span class="kt">Cuenta · 30 días</span>'+
@@ -1327,19 +1342,79 @@ body{padding-top:env(safe-area-inset-top)}
     /* ÚNICO lugar donde vive el dominio público de los imanes. Cambiar aquí al migrar
        a plan.yodesarrollo.mx / cuestionario.yodesarrollo.mx y todo el board lo hereda. */
     var LG_DEST={pot:'https://yodesarrollomx.github.io/plan-potencial/',cuest:'https://aurumarquitectos.github.io/experiencia/'};
-    var LG_FUENTE={fb:'facebook',ig:'instagram'};
+    /* ---- liga CORTA (2026-09-08) ----
+       La liga larga medía 96 caracteres y se veía mal en el bio y en los posts.
+       El rebote de Aurum la deja en ~36 y arma las mismas UTM del otro lado: lo
+       que llega al Sheet es idéntico, fbclid y referrer incluidos.
+       Vive en aurumarquitectos.github.io, carpeta public/r/ de ese repo.
+       Solo el CUESTIONARIO se acorta: el rebote está en el dominio de Aurum y el
+       Plan de Potencial es de Yo Desarrollo — mandarlo por aquí cruzaría las
+       marcas. Cuando tenga su propio /r/, se agrega aquí y el board lo hereda. */
+    var LG_CORTO={cuest:'https://aurumarquitectos.github.io/r/'};
     /* utm_content: minusculas, sin acentos ni espacios — asi entra limpio al Sheet */
     function lgSlug(s){
       return String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
         .replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,48);
     }
-    window.genLinkFB=function(){
+    /* ESPEJO de la tabla CANALES del rebote (public/r/index.html del repo
+       aurumarquitectos.github.io). Las dos tienen que decir lo mismo: el board
+       arma la liga LARGA con ésta y el rebote arma la corta con la suya, así que
+       si divergen el mismo canal caería en dos utm_source distintos según el
+       destino y el Sheet mostraría la campaña partida en dos. */
+    var LG_UTM={ig:["instagram","social"],fb:["facebook","social"],tt:["tiktok","social"],
+      yt:["youtube","social"],li:["linkedin","social"],pi:["pinterest","social"],
+      wa:["whatsapp","mensaje"],em:["correo","email"],qr:["qr","impreso"],
+      we:["sitio-web","referido"],go:["google","buscador"],ma:["maps","buscador"]};
+    function lgUTM(c){ return LG_UTM[c]||[c,"otro"]; }
+    /* Arma la liga del destino elegido. 'codigo' es la forma que entiende el rebote
+       (260908 para una fecha, _shortid para un post ya publicado) y 'campana' la
+       forma larga que va en utm_campaign. Las dos describen la MISMA campaña: si el
+       destino no tiene rebote, sale la liga larga de siempre y nada cambia. */
+    function lgArma(dest,red,codigo,campana,pieza){
+      if(LG_CORTO[dest]) return LG_CORTO[dest]+"?"+red+codigo+(pieza?"-"+pieza:"");
+      var u=lgUTM(red);
+      return LG_DEST[dest]+"?utm_source="+u[0]+"&utm_medium="+u[1]+"&utm_campaign="+red+"-"+campana+(pieza?"&utm_content="+pieza:"");
+    }
+    /* Liga PERMANENTE: sin fecha, la pieza es la campaña. Para lo que vive meses
+       (QR de una lona, firma del correo, link del perfil). Misma razón por la que
+       la bio nunca llevó fecha: con una, pasaría por publicación de ese día. */
+    function lgArmaFija(dest,red,pieza){
+      if(LG_CORTO[dest]) return LG_CORTO[dest]+"?"+red+"-"+pieza;
+      var u=lgUTM(red), medio=(pieza==="bio")?"bio":u[1];
+      return LG_DEST[dest]+"?utm_source="+u[0]+"&utm_medium="+medio+"&utm_campaign="+red+"-"+pieza+"&utm_content="+pieza;
+    }
+    /* cambioCanal=true cuando el disparo vino del selector de canal: solo ahí se
+       reajusta "sin fecha", para no pisarle la decisión a quien ya la movió. */
+    window.genLinkFB=function(cambioCanal){
       var sel=$("lgDest"), inp=$("lgUrl"); if(!sel||!inp) return;
       var red=($("lgRed")&&$("lgRed").value)||"fb";
+      var libre=$("lgCanal"), chk=$("lgFija"), ayuda=$("lgAyuda");
+      if(libre) libre.style.display=(red==="otro")?"":"none";
+      if(red==="otro"){
+        /* solo letras: el canal es el prefijo del código, no puede traer guiones */
+        red=String((libre&&libre.value)||"").toLowerCase().normalize("NFD")
+              .replace(/[̀-ͯ]/g,"").replace(/[^a-z]/g,"").slice(0,10);
+      }
+      if(cambioCanal&&chk) chk.checked=!!LG_PERMANENTES[($("lgRed")||{}).value];
+      var fija=!!(chk&&chk.checked);
+      var pieza=lgSlug($("lgPieza")&&$("lgPieza").value);
       var d=new Date(), pad=function(n){return (n<10?"0":"")+n;};
       var fecha=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
-      var pieza=lgSlug($("lgPieza")&&$("lgPieza").value);
-      inp.value=LG_DEST[sel.value]+"?utm_source="+LG_FUENTE[red]+"&utm_medium=social&utm_campaign="+red+"-"+fecha+(pieza?"&utm_content="+pieza:"");
+      /* misma fecha en la forma corta del rebote: AAMMDD */
+      var corto=String(d.getFullYear()).slice(2)+pad(d.getMonth()+1)+pad(d.getDate());
+
+      if(!red){ inp.value=""; if(ayuda) ayuda.innerHTML='Escribe el <b>nombre del canal</b> (solo letras) para armar el link.'; return; }
+      if(fija&&!pieza){
+        /* Sin fecha Y sin pieza no hay campaña que medir: el lead caería en
+           "(directo)" y no se podría distinguir de nadie. Mejor no dar link. */
+        inp.value="";
+        if(ayuda) ayuda.innerHTML='Una liga <b>sin fecha</b> necesita un nombre en <b>pieza</b> — es lo que la identifica. Ej.: <code>lona-obra</code>, <code>tarjeta</code>, <code>firma</code>, <code>bio</code>.';
+        return;
+      }
+      inp.value=fija?lgArmaFija(sel.value,red,pieza):lgArma(sel.value,red,corto,fecha,pieza);
+      if(ayuda) ayuda.innerHTML=fija
+        ? 'Liga <b>permanente</b>: no lleva fecha, así que sirve meses sin ensuciar la campaña de ningún día. Ideal para el QR de una lona, la firma del correo o el link del perfil. Los leads pueden tardar hasta 48 h en aparecer.'
+        : 'Genera el link <b>el mismo día que publicas</b> (la fecha va dentro de la campaña); para un post ya publicado usa el generador dentro de su ficha. La <b>pieza</b> es opcional y sirve para distinguir publicaciones de una misma serie. Los leads pueden tardar hasta 48 h en aparecer.';
     };
     window.copiarLinkFB=function(){
       var inp=$("lgUrl"); if(!inp) return;
@@ -1350,12 +1425,96 @@ body{padding-top:env(safe-area-inset-top)}
         try{document.execCommand("copy"); toast("Link copiado ✓");}catch(e){toast("No se pudo copiar — selecciona el texto y copia a mano",true);}
       }
     };
+    /* ================= QR IMPRIMIBLE =================
+       El QR lleva la MISMA liga medible que el botón "Copiar": quien lo escanea
+       entra por el rebote y cae en su campaña igual que si hubiera tecleado el
+       link. Por eso un QR de lona se puede comparar contra un post de Instagram
+       en la misma tabla del board — que es justo lo que no se podía antes.
+
+       La librería se carga SOLO al pedir el primer QR (20 KB de cdnjs): el board
+       abre igual de rápido para quien nunca imprime nada. Si el CDN no responde
+       se dice; no se imprime un cuadro roto. */
+    var QR_LIB="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+    var qrCargando=null;
+    function qrCargar(){
+      if(window.qrcode) return Promise.resolve();
+      if(qrCargando) return qrCargando;
+      qrCargando=new Promise(function(ok,mal){
+        var s=document.createElement("script");
+        s.src=QR_LIB; s.onload=function(){ok();};
+        s.onerror=function(){qrCargando=null;mal(new Error("cdn"));};
+        document.head.appendChild(s);
+      });
+      return qrCargando;
+    }
+    function qrHoja(w,svg,url,titulo){
+      /* Hoja de impresión, no pantalla: medidas en cm para que el QR salga del
+         tamaño que se pidió y no del que quepa en el monitor. 4 cm es el mínimo
+         que un teléfono lee cómodo a un brazo de distancia; 6 cm para lona. */
+      var doc='<!doctype html><html lang="es"><head><meta charset="utf-8">'+
+        '<title>QR · '+esc(titulo||"Aurum Arquitectos")+'</title><style>'+
+        '@page{margin:1.5cm}'+
+        'body{margin:0;font-family:Georgia,serif;color:#1a1a1a;background:#faf7f2;'+
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;'+
+          'min-height:100vh;text-align:center;padding:1cm;box-sizing:border-box}'+
+        '.marca{letter-spacing:.28em;font-size:10pt;color:#b8975a;font-family:Helvetica,Arial,sans-serif;margin-bottom:.5cm}'+
+        '.lema{font-size:15pt;margin:0 0 .7cm;max-width:14cm;line-height:1.35}'+
+        '.qr{width:6cm;height:6cm;padding:.5cm;background:#fff;border:1px solid #ece6da}'+
+        '.qr svg{width:100%;height:100%;display:block}'+
+        '.pie{margin-top:.6cm;font-family:Helvetica,Arial,sans-serif;font-size:8.5pt;color:#6b6055;word-break:break-all;max-width:12cm}'+
+        '.campana{margin-top:.25cm;font-family:Helvetica,Arial,sans-serif;font-size:7.5pt;color:#8a7d65}'+
+        '.barra{margin-top:1cm;display:flex;gap:8px}'+
+        '.barra button{font-family:Helvetica,Arial,sans-serif;font-size:10pt;padding:9px 16px;'+
+          'border:1px solid #b8975a;background:#b8975a;color:#fff;border-radius:8px;cursor:pointer}'+
+        '.barra button.sec{background:#fff;color:#1a1a1a;border-color:#ece6da}'+
+        '@media print{.barra{display:none}body{background:#fff;min-height:auto}}'+
+        '</style></head><body>'+
+        '<div class="marca">AURUM ARQUITECTOS</div>'+
+        '<p class="lema">Descubre cómo sería tu casa<br>en 90 segundos</p>'+
+        '<div class="qr">'+svg+'</div>'+
+        '<div class="pie">'+esc(url)+'</div>'+
+        '<div class="campana">'+esc(titulo||"")+'</div>'+
+        '<div class="barra">'+
+          '<button onclick="print()">Imprimir</button>'+
+          '<button class="sec" onclick="bajar()">Descargar SVG</button>'+
+        '</div>'+
+        '<script>function bajar(){var s=document.querySelector(".qr svg").outerHTML;'+
+        'var b=new Blob([s],{type:"image/svg+xml"});var a=document.createElement("a");'+
+        'a.href=URL.createObjectURL(b);a.download='+JSON.stringify("qr-"+(titulo||"aurum")+".svg")+';a.click();}<\/script>'+
+        '</body></html>';
+      w.document.open(); w.document.write(doc); w.document.close();
+    }
+    window.qrImprimir=function(){
+      var inp=$("lgUrl"), url=inp&&inp.value;
+      if(!url){ toast("Primero genera el link de arriba",true); return; }
+      /* La ventana se abre AQUÍ, dentro del clic: si se abriera después de cargar
+         la librería, el navegador la trataría como popup y la bloquearía. */
+      var w=window.open("","_blank");
+      if(!w){ toast("El navegador bloqueó la ventana — permite las ventanas emergentes de este sitio",true); return; }
+      w.document.write("<p style='font:14px Helvetica;padding:24px;color:#6b6055'>Armando el QR…</p>");
+      /* el pie de la hoja dice QUÉ se imprimió: la pieza si la hay, si no el
+         canal — y para "Otro…" el nombre que se escribió, no la palabra "otro" */
+      var canalSel=($("lgRed")||{}).value||"";
+      if(canalSel==="otro") canalSel=lgSlug($("lgCanal")&&$("lgCanal").value)||"otro";
+      var titulo=lgSlug($("lgPieza")&&$("lgPieza").value)||canalSel;
+      qrCargar().then(function(){
+        /* tipo 0 = que la librería elija el tamaño mínimo en que quepa la liga.
+           Corrección "M" aguanta ~15% de daño: suficiente para una lona a la
+           intemperie o una tarjeta que se dobla en la cartera. */
+        var qr=qrcode(0,"M"); qr.addData(url); qr.make();
+        qrHoja(w,qr.createSvgTag({cellSize:8,margin:0,scalable:true}),url,titulo);
+      }).catch(function(){
+        try{w.close();}catch(e){}
+        toast("No se pudo cargar el generador de QR (sin internet o CDN bloqueado)",true);
+      });
+    };
     /* ---- generador de link CON EL ID de un post ya publicado (edicion retroactiva, no se mezcla con otros) ---- */
     window.genLinkPost=function(postId,red){
       var sel=$("lgDestP"), inp=$("lgUrlP"); if(!sel||!inp) return;
       red=red||"fb";
       var shortid=String(postId).split("_").pop().slice(-10);
-      inp.value=LG_DEST[sel.value]+"?utm_source="+LG_FUENTE[red]+"&utm_medium=social&utm_campaign="+red+"-"+shortid;
+      /* el guion bajo le dice al rebote "esto es un post, no una fecha" */
+      inp.value=lgArma(sel.value,red,"_"+shortid,shortid,"");
     };
     window.copiarLinkPost=function(){
       var inp=$("lgUrlP"); if(!inp) return;
