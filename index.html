@@ -1484,19 +1484,39 @@ body{padding-top:env(safe-area-inset-top)}
         '</body></html>';
       w.document.open(); w.document.write(doc); w.document.close();
     }
+    /* Plan B cuando el bloqueador de ventanas gana: en vez de dejar al usuario
+       peleándose con la configuración de Chrome, se le baja el QR en SVG, que es
+       lo mismo que ofrece el botón de la hoja. El archivo se abre e imprime desde
+       cualquier lado y es el formato que además pide la imprenta. */
+    function qrBajarSVG(svg,titulo){
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(new Blob([svg],{type:"image/svg+xml"}));
+      a.download="qr-"+(titulo||"aurum")+".svg";
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+    }
     window.qrImprimir=function(){
       var inp=$("lgUrl"), url=inp&&inp.value;
       if(!url){ toast("Primero genera el link de arriba",true); return; }
-      /* La ventana se abre AQUÍ, dentro del clic: si se abriera después de cargar
-         la librería, el navegador la trataría como popup y la bloquearía. */
-      var w=window.open("","_blank");
-      if(!w){ toast("El navegador bloqueó la ventana — permite las ventanas emergentes de este sitio",true); return; }
-      w.document.write("<p style='font:14px Helvetica;padding:24px;color:#6b6055'>Armando el QR…</p>");
       /* el pie de la hoja dice QUÉ se imprimió: la pieza si la hay, si no el
          canal — y para "Otro…" el nombre que se escribió, no la palabra "otro" */
       var canalSel=($("lgRed")||{}).value||"";
       if(canalSel==="otro") canalSel=lgSlug($("lgCanal")&&$("lgCanal").value)||"otro";
       var titulo=lgSlug($("lgPieza")&&$("lgPieza").value)||canalSel;
+      /* La ventana se abre AQUÍ, dentro del clic: si se abriera después de cargar
+         la librería, el navegador la trataría como popup y la bloquearía. */
+      var w=window.open("","_blank");
+      if(!w){
+        toast("Bloquearon la ventana — te bajo el QR en SVG");
+        qrCargar().then(function(){
+          var q=qrcode(0,"M"); q.addData(url); q.make();
+          qrBajarSVG(q.createSvgTag({cellSize:8,margin:0,scalable:true}),titulo);
+        }).catch(function(){
+          toast("No se pudo cargar el generador de QR (sin internet o CDN bloqueado)",true);
+        });
+        return;
+      }
+      w.document.write("<p style='font:14px Helvetica;padding:24px;color:#6b6055'>Armando el QR…</p>");
       qrCargar().then(function(){
         /* tipo 0 = que la librería elija el tamaño mínimo en que quepa la liga.
            Corrección "M" aguanta ~15% de daño: suficiente para una lona a la
