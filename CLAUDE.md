@@ -45,9 +45,17 @@ sitio para clientes (`README.md`). Título de la pestaña: "Tablero · Yo Desarr
    `PAUSA` con ceros y letrero (`index.html:370`).
 8. **`apps-script/portero-auth.gs` es ESPEJO.** Lo que corre es lo pegado en el editor de
    Apps Script. Cambiarlo aquí no cambia nada en vivo.
-9. **Ligas medibles: nunca a mano.** Se generan con la caja del propio tablero
-   (`window.genLinkFB`, `index.html:1271`) o con `liga.py`; convención
-   `utm_campaign=<fb|ig>-<fecha>` (memoria [[yod-ligas-convencion]]).
+9. **Ligas medibles: nunca a mano.** Se generan con la caja 🎯 del propio tablero
+   (`window.genLinkFB`) o con `liga.py`; convención
+   `utm_campaign=<canal>-<fecha>` (memoria [[yod-ligas-convencion]]).
+10. **La tabla de canales `LG_UTM` tiene DOS GEMELAS y las tres deben decir lo
+    mismo:** `CANALES` del acortador (repo `aurumarquitectos.github.io`,
+    `public/r/index.html`) y `CANALES` de `yod_audit/liga.py`. Si divergen, el
+    mismo canal cae en dos `utm_source` distintos según quién generó la liga y el
+    Sheet muestra la campaña partida en dos. Antes de tocar cualquiera:
+    `node tests/liga-corta/correr.mjs` en el repo `aurumarquitectos.github.io`
+    (70 pruebas, leen los archivos reales de los tres repos). Ver la memoria
+    [[liga-corta-rebote]].
 
 ## Archivos
 - `index.html` — el tablero completo, un solo archivo de ~128 KB, sin build. Ahí viven
