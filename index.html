@@ -283,6 +283,8 @@ body{padding-top:env(safe-area-inset-top)}
   <a class="logo" href="https://yodesarrollo.mx" target="_blank" rel="noopener"><img class="logo-img" src="img/yod-logo.png" alt="Yo Desarrollo"><span class="sub">Tablero de medición</span></a>
   <div class="hctrl">
     <span class="muted" id="periodo">—</span>
+    <!-- gastos que quedaron guardados solo en este teléfono, esperando subir al Sheet (ver flushQueue) -->
+    <span class="muted" id="qPend" style="display:none;color:var(--amar)"></span>
     <button id="badge" type="button" data-s="loading" title="Actualizar anuncios, leads y métricas desde internet"><span class="dot"></span><span class="t">Actualizar ahora</span></button>
   </div>
 </header>
@@ -317,6 +319,39 @@ body{padding-top:env(safe-area-inset-top)}
      portero de respaldo aunque la sesión sea válida. Ya no se recarga ni se cierra
      la sesión por eso: solo se avisa, y actualizarTodo cae al respaldo local. */
   function credencialRechazada(){ _pyodAviso(); }
+  /* Texto legible de un gasto encolado, para que Alejandro lo pueda recapturar sin perderlo
+     (mismos campos que arma guardarGasto: semana, monto, campañas). */
+  function _textoGasto(p){
+    p=p||{};
+    var partes=[];
+    if(p.semana) partes.push("semana "+p.semana);
+    if(p.monto) partes.push(money(p.monto));
+    if(p.campanas) partes.push(p.campanas);
+    return partes.length?partes.join(" · "):"(gasto sin detalle)";
+  }
+  /* Aviso PERSISTENTE (no se autooculta como el toast) cuando un gasto encolado se da
+     por perdido: credencial vencida ('liga') o 3 intentos seguidos rechazados. Se queda
+     en pantalla hasta que Alejandro lo cierra a mano, para que no se le pase. */
+  function avisoGastoPerdido(payload){
+    var box=$("gastoPerdidoAviso");
+    if(!box){
+      box=document.createElement("div"); box.id="gastoPerdidoAviso";
+      box.style.cssText="position:fixed;left:50%;bottom:100px;transform:translateX(-50%);z-index:2147483000;max-width:min(560px,92vw);background:#221E17;color:#F1EDE3;border:1px solid rgba(255,255,255,.14);border-left:3px solid #E0605A;border-radius:12px;padding:14px 16px;font-family:'Instrument Sans',system-ui,sans-serif;font-size:13px;line-height:1.5;box-shadow:0 18px 48px rgba(0,0,0,.5)";
+      document.body.appendChild(box);
+    }
+    var linea=document.createElement("div");
+    linea.style.cssText="margin:0 0 8px 0";
+    linea.innerHTML='<b style="color:#E0605A">Este gasto NO se guardó.</b> Vuelve a entrar con el Portero y captúralo de nuevo: <span style="font-weight:600">'+esc(_textoGasto(payload))+'</span>';
+    box.insertBefore(linea, box.firstChild);
+    if(!box.querySelector("[data-cerrar-gp]")){
+      var cerrar=document.createElement("button");
+      cerrar.setAttribute("data-cerrar-gp","1");
+      cerrar.textContent="Ya lo anoté";
+      cerrar.style.cssText="background:none;border:0;color:#9A9182;cursor:pointer;text-decoration:underline;font:inherit;display:block;margin-left:auto";
+      cerrar.onclick=function(){box.remove();};
+      box.appendChild(cerrar);
+    }
+  }
   var QKEY="aurum_board_q_v1";
   var DATA=null, LAST=null, METRICS=null, DATA_POT=null;
 
@@ -475,13 +510,44 @@ body{padding-top:env(safe-area-inset-top)}
       .then(function(r){clearTimeout(t);return r.json();})
       .then(function(j){if(j&&j.ok)return j;if(j&&j.error==="liga")credencialRechazada();throw new Error((j&&j.error)||"rechazado");});
   }
-  function qload(){try{return JSON.parse(localStorage.getItem(QKEY))||[];}catch(e){return [];}}
-  function qsave(q){try{localStorage.setItem(QKEY,JSON.stringify(q));}catch(e){}}
+  /* Cada elemento de la cola vive como {intentos:N, payload:{...}} para poder contar los
+     fallos sin tocar lo que se manda al Sheet. Los gastos que ya estaban encolados de antes
+     (formato viejo: el payload suelto) se adoptan aquí mismo, sin perderlos. */
+  function qload(){
+    try{
+      var q=JSON.parse(localStorage.getItem(QKEY))||[];
+      return q.map(function(it){ return (it&&it.payload)?it:{intentos:0,payload:it}; });
+    }catch(e){return [];}
+  }
+  function qsave(q){try{localStorage.setItem(QKEY,JSON.stringify(q));}catch(e){} qUpdateBadge();}
+  /* Contador chico y siempre visible de cuántos gastos siguen esperando subir; si la cola
+     está vacía no se ve nada (regla del encargo: no meter ruido cuando no hace falta). */
+  function qUpdateBadge(){
+    var el=$("qPend"); if(!el) return;
+    var n=qload().length;
+    if(n>0){ el.textContent=n+" gasto"+(n>1?"s":"")+" pendiente"+(n>1?"s":"")+" de subir"; el.style.display=""; }
+    else { el.style.display="none"; }
+  }
   function flushQueue(){
     var q=qload(); if(!q.length) return;
-    postSheet(Object.assign({},q[0])).then(function(){var q2=qload();q2.shift();qsave(q2);if(q2.length)flushQueue();else toast("Gasto sincronizado con el Sheet");}).catch(function(){});
+    var item=q[0];
+    postSheet(Object.assign({},item.payload)).then(function(){
+      var q2=qload(); q2.shift(); qsave(q2);
+      if(q2.length) flushQueue(); else toast("Gasto sincronizado con el Sheet");
+    }).catch(function(err){
+      /* Antes este catch quedaba vacío: el gasto podía fallar para siempre (credencial
+         vencida, Sheet caído) y Alejandro nunca se enteraba — creía que ya había quedado
+         guardado. Ahora: al 3er fallo seguido, o de inmediato si el rechazo es por la
+         credencial ('liga'), se saca de la cola y se avisa con el texto del gasto a la vista. */
+      var q2=qload(); if(!q2.length) return;
+      q2[0].intentos=(q2[0].intentos||0)+1;
+      var porLiga=err&&err.message==="liga";
+      if(porLiga||q2[0].intentos>=3){ var perdido=q2.shift(); qsave(q2); avisoGastoPerdido(perdido.payload); }
+      else { qsave(q2); }
+    });
   }
   window.addEventListener("online",flushQueue); setInterval(flushQueue,45000); setTimeout(flushQueue,3000);
+  qUpdateBadge();
 
   var TT=null;
   function toast(msg,warn){var el=$("toast");el.className=warn?"warn":"";el.textContent=msg;el.classList.add("on");clearTimeout(TT);TT=setTimeout(function(){el.classList.remove("on");},3200);}
@@ -1326,7 +1392,7 @@ body{padding-top:env(safe-area-inset-top)}
       $("gMonto").value="";$("gCamp").value=""; fetchData(false);
     }).catch(function(err){
       /* sin conexión o rechazo: encola y reintenta */
-      if(!navigator.onLine){ var q=qload(); q.push(payload); qsave(q); toast("Sin conexión: guardado en cola, se sube al reconectar"); }
+      if(!navigator.onLine){ var q=qload(); q.push({intentos:0,payload:payload}); qsave(q); toast("Sin conexión: guardado en cola, se sube al reconectar"); }
       else toast("No se pudo guardar: "+(err&&err.message||"error"),true);
       btn.disabled=false; btn.textContent="Guardar en el Sheet";
     });
