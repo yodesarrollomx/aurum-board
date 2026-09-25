@@ -4,8 +4,8 @@ name: Guardian - uptime de formularios
 # issue de GitHub solo. Es el guardian de mayor valor: si un formulario se cae, se
 # pierden leads, y hoy nada mas lo avisaba.
 on:
-  schedule:
-    - cron: "*/30 * * * *"
+  # 25-sep-2026: sin horario propio. Lo vigila el vigía único de YOD OS
+  # (yodesarrollomx/yod-portal · vigia-diario.yml, cada hora). Queda el botón manual.
   workflow_dispatch:
 
 permissions:

@@ -3,8 +3,8 @@ name: Guardian - salud del refresco
 # Cada hora (al minuto 30, desfasado del refresco): confirma que el refresco del board
 # haya tenido una corrida EXITOSA reciente. Si el refresco muere en silencio, avisa.
 on:
-  schedule:
-    - cron: "30 * * * *"
+  # 25-sep-2026: sin horario propio. Lo vigila el vigía único de YOD OS
+  # (yodesarrollomx/yod-portal · vigia-diario.yml, cada hora). Queda el botón manual.
   workflow_dispatch:
 
 permissions:
