@@ -1,0 +1,96 @@
+name: Arquitectura YOD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Commit base completo; opcional junto a head_sha
+        required: false
+        type: string
+      head_sha:
+        description: Commit completo a validar; opcional junto a base_sha
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  impacto:
+    name: Arquitectura YOD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar referencias manuales
+        env:
+          BASE_INPUT: ${{ inputs.base_sha }}
+          HEAD_INPUT: ${{ inputs.head_sha }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          if [ -n "$BASE_INPUT$HEAD_INPUT" ]; then
+            [[ "$BASE_INPUT" =~ ^[0-9a-f]{40}$ ]] && [[ "$HEAD_INPUT" =~ ^[0-9a-f]{40}$ ]] || { echo 'Se requieren ambos SHA completos.'; exit 1; }
+          fi
+          if [ -n "$HEAD_INPUT" ]; then
+            [ "$HEAD_INPUT" = "$EVENT_SHA" ] || { echo 'El SHA solicitado debe coincidir con el ref que recibe el check.'; exit 1; }
+          fi
+      - name: Código completo del cambio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.head_sha || github.event.pull_request.head.sha || github.sha }}
+      - name: Atlas aprobado
+        uses: actions/checkout@v4
+        with:
+          repository: yodesarrollomx/yod-portal
+          ref: 04cf3ebf7b8e7845fd671b36a24ebf78f3ef3af4
+          path: .yod-atlas
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /scripts/verificar-impacto.cjs
+            /docs/arquitectura/modelo.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolver comparación
+        id: refs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          BASE_INPUT: ${{ inputs.base_sha }}
+          HEAD_INPUT: ${{ inputs.head_sha }}
+        run: |
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ "$EVENT_NAME" = pull_request ]; then
+            BASE_SHA="$PR_BASE"
+          elif [ "$EVENT_NAME" = push ]; then
+            BASE_SHA="$PUSH_BASE"
+          elif [ -n "$BASE_INPUT" ]; then
+            BASE_SHA="$BASE_INPUT"
+            [ "$HEAD_SHA" = "$HEAD_INPUT" ] || { echo 'El checkout no coincide con el commit solicitado.'; exit 1; }
+            [ "$BASE_SHA" != "$HEAD_SHA" ] || { echo 'La comparación no puede estar vacía.'; exit 1; }
+            EXPECTED_BASE=$(git merge-base "$HEAD_SHA" origin/main)
+            [ "$EXPECTED_BASE" != "$HEAD_SHA" ] || { echo 'Para commits de main usa dispatch sin inputs.'; exit 1; }
+            [ "$BASE_SHA" = "$EXPECTED_BASE" ] || { echo 'La base debe cubrir todo el cambio respecto de main.'; exit 1; }
+          else
+            BASE_SHA=$(git merge-base HEAD origin/main)
+            # En main se comprueba el último cambio, evitando una comparación vacía.
+            if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
+              BASE_SHA=$(git merge-base HEAD^ origin/main)
+            fi
+          fi
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && [[ ! "$BASE_SHA" =~ ^0+$ ]] || { echo 'Falta una base histórica válida.'; exit 1; }
+          git cat-file -e "$BASE_SHA^{commit}"
+          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+      - name: Verificar impacto contra el atlas
+        env:
+          BASE_SHA: ${{ steps.refs.outputs.base }}
+          HEAD_SHA: ${{ steps.refs.outputs.head }}
+        run: node .yod-atlas/scripts/verificar-impacto.cjs --model .yod-atlas/docs/arquitectura/modelo.json --base "$BASE_SHA" --head "$HEAD_SHA" --repo "$GITHUB_REPOSITORY"
+      - name: Verificar publicación con dobles sin red
+        run: node --test tests/publicar-metricas.test.cjs

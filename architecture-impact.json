@@ -1,0 +1,15 @@
+{
+  "model_revision": "2026-09-30.1",
+  "proposal_id": "CHG-ATLAS-001",
+  "summary": "Incorporar trazabilidad del atlas, actualizar referencia del shell validado y sustituir publicación directa de métricas por PR con checks del commit exacto y solicitud explícita de Pages.",
+  "components": [
+    "SYS-MARKETING",
+    "GAS-MARKETING",
+    "SHEET-MARKETING"
+  ],
+  "tests": [
+    "git diff --check",
+    "node --test tests/publicar-metricas.test.cjs"
+  ],
+  "rollback": "Revertir el commit de este cambio mediante revisión y repetir las verificaciones locales. No borrar ni restaurar registros de negocio, Sheets o archivos de clientes como parte del rollback."
+}
