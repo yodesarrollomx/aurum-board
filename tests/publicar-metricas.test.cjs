@@ -4,12 +4,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const { publish, dataPaths } = require('../scripts/publicar-metricas.cjs');
 
 const BASE = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
 const MERGE = 'c'.repeat(40);
 const BRANCH = 'bot/metricas-123-1';
+const ACTIONS_TOKEN = 'synthetic-actions-token';
+const APP_TOKEN = 'synthetic-app-token';
 
 function fixture(t, changes = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'aurum-publicar-'));
@@ -25,7 +28,7 @@ function fixture(t, changes = {}) {
   const goodRun = { id: 15, event: 'workflow_dispatch', head_sha: HEAD, head_branch: BRANCH, status: 'completed', conclusion: 'success' };
   const result = value => ({ status: 0, stdout: typeof value === 'string' ? value : JSON.stringify(value) });
   const exec = (argv, options) => {
-    calls.push({ argv, input: options.input });
+    calls.push({ argv, input: options.input, env: options.env });
     if (changes.override) {
       const custom = changes.override(argv, options, calls);
       if (custom !== undefined) return custom;
@@ -52,7 +55,8 @@ function fixture(t, changes = {}) {
     }
     throw new Error('Comando inesperado en el doble: ' + argv.join(' '));
   };
-  const options = { cwd, env: { GITHUB_REPOSITORY: 'yodesarrollomx/aurum-board', GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1' },
+  const options = { cwd, env: { GITHUB_REPOSITORY: 'yodesarrollomx/aurum-board', GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1',
+    GH_TOKEN: ACTIONS_TOKEN, PR_CREATION_TOKEN: APP_TOKEN },
     exec, now: () => clock, sleep: async ms => { clock += ms; }, intervalMs: 10, waitMs: 30, log: msg => logs.push(msg) };
   return { cwd, options, calls, logs };
 }
@@ -82,8 +86,82 @@ test('solo la rama de corrida recibe el commit; PR, dispatch exacto, merge y sol
 
 test('sin cambios no crea commits ni ejecuta GitHub', async t => {
   const f = fixture(t, { status: '' });
+  delete f.options.env.PR_CREATION_TOKEN;
+  delete f.options.env.GH_TOKEN;
   assert.deepEqual(await publish(f.options), { changed: false });
   assert.equal(f.calls.length, 1);
+});
+
+test('detectar cambios permite decidir si hace falta token sin modificar archivos ni llamar GitHub', async t => {
+  for (const status of ['', ' M metrics.json\0']) {
+    const f = fixture(t, { status });
+    delete f.options.env.PR_CREATION_TOKEN;
+    delete f.options.env.GH_TOKEN;
+    const originalImpact = fs.readFileSync(path.join(f.cwd, 'architecture-impact.json'), 'utf8');
+    assert.deepEqual(await publish({ ...f.options, checkOnly: true }), { changed: Boolean(status) });
+    assert.deepEqual(f.calls.map(c => c.argv[1]), ['status']);
+    assert.equal(fs.readFileSync(path.join(f.cwd, 'architecture-impact.json'), 'utf8'), originalImpact);
+  }
+});
+
+test('la CLI de detección ejecuta git sin heredar PR_CREATION_TOKEN', t => {
+  const f = fixture(t);
+  const trace = path.join(f.cwd, 'environment.json');
+  const fakeGit = path.join(f.cwd, 'git');
+  fs.writeFileSync(fakeGit, `#!${process.execPath}\n`
+    + 'require("node:fs").writeFileSync("environment.json", JSON.stringify({GH_TOKEN:process.env.GH_TOKEN,PR_CREATION_TOKEN:process.env.PR_CREATION_TOKEN}));\n'
+    + 'process.stdout.write(" M metrics.json\\0");\n', { mode: 0o700 });
+  const result = spawnSync(process.execPath, [path.resolve(__dirname, '../scripts/publicar-metricas.cjs'), '--check-changes'], {
+    cwd: f.cwd, encoding: 'utf8', timeout: 10000,
+    env: { ...process.env, ...f.options.env, PATH: f.cwd + path.delimiter + process.env.PATH },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'changed=true\n');
+  assert.deepEqual(JSON.parse(fs.readFileSync(trace, 'utf8')), { GH_TOKEN: ACTIONS_TOKEN });
+});
+
+test('credenciales ausentes o compartidas impiden mutaciones locales y remotas', async t => {
+  for (const credentials of [
+    { PR_CREATION_TOKEN: undefined },
+    { PR_CREATION_TOKEN: '  ' },
+    { GH_TOKEN: undefined },
+    { PR_CREATION_TOKEN: ACTIONS_TOKEN },
+  ]) {
+    const f = fixture(t);
+    Object.assign(f.options.env, credentials);
+    const originalImpact = fs.readFileSync(path.join(f.cwd, 'architecture-impact.json'), 'utf8');
+    await assert.rejects(publish(f.options), /token|credencial/i);
+    assert.deepEqual(f.calls.map(c => c.argv[1]), ['status']);
+    assert.equal(fs.readFileSync(path.join(f.cwd, 'architecture-impact.json'), 'utf8'), originalImpact);
+  }
+});
+
+test('sólo POST pulls recibe la App; git, guard, checks, merge y Pages conservan Actions', async t => {
+  const f = fixture(t);
+  await publish(f.options);
+  const appCalls = f.calls.filter(c => c.env && c.env.GH_TOKEN === APP_TOKEN);
+  assert.equal(appCalls.length, 1);
+  assert.deepEqual(appCalls[0].argv.slice(0, 5), ['gh', 'api', '--method', 'POST', 'repos/yodesarrollomx/aurum-board/pulls']);
+  for (const call of f.calls) {
+    assert.equal(call.env.PR_CREATION_TOKEN, undefined);
+    assert.equal(call.env.GH_TOKEN, call === appCalls[0] ? APP_TOKEN : ACTIONS_TOKEN);
+    assert.ok(!call.argv.join(' ').includes(APP_TOKEN));
+    assert.ok(!(call.input || '').includes(APP_TOKEN));
+  }
+  assert.equal(f.options.env.GH_TOKEN, ACTIONS_TOKEN);
+  assert.equal(f.options.env.PR_CREATION_TOKEN, APP_TOKEN);
+  assert.ok(!f.logs.join('\n').includes(APP_TOKEN));
+});
+
+test('fallo al crear PR no expone tokens ni continúa con guard o merge', async t => {
+  const f = fixture(t, { override: argv => argv[4] && argv[4].endsWith('/pulls')
+    ? { status: 1, stdout: APP_TOKEN, stderr: APP_TOKEN } : undefined });
+  await assert.rejects(publish(f.options), error => {
+    assert.ok(!error.message.includes(APP_TOKEN));
+    return /Falló gh api/.test(error.message);
+  });
+  assert.equal(mutations(f.calls, 'merge').length, 0);
+  assert.ok(!f.calls.some(c => c.argv[4] && c.argv[4].endsWith('/dispatches')));
 });
 
 test('rechaza archivos ajenos y renombres antes de publicar', () => {
@@ -136,6 +214,35 @@ test('checks obligatorios pendientes esperan hasta el límite', async t => {
   const f = fixture(t, { checks: [{ name: 'Arquitectura YOD', bucket: 'pass' }, { name: 'otro', bucket: 'pending' }] });
   await assert.rejects(publish(f.options), /tiempo de espera.*checks.*PR #42/);
   assert.equal(mutations(f.calls, 'merge').length, 0);
+});
+
+test('rollup inicialmente vacío espera hasta recibir todos los checks obligatorios', async t => {
+  for (const empty of ['', '[]']) {
+    let reads = 0;
+    const f = fixture(t, { override: argv => argv[2] === 'checks' && reads++ === 0
+      ? { status: 1, stdout: empty } : undefined });
+    const result = await publish(f.options);
+    assert.equal(result.merged, true);
+    assert.equal(f.calls.filter(c => c.argv[2] === 'checks').length, 2);
+  }
+});
+
+test('rollup vacío persistente vence sin merge ni Pages', async t => {
+  const f = fixture(t, { override: argv => argv[2] === 'checks'
+    ? { status: 1, stdout: '' } : undefined });
+  await assert.rejects(publish(f.options), /tiempo de espera.*checks.*PR #42/);
+  assert.equal(f.calls.filter(c => c.argv[2] === 'checks').length, 3);
+  assert.equal(mutations(f.calls, 'merge').length, 0);
+  assert.ok(!f.calls.some(c => c.argv[4] && c.argv[4].endsWith('/pages/builds')));
+});
+
+test('rollup inválido no se considera aprobado', async t => {
+  for (const stdout of ['null', '{}', '[{}]']) {
+    const f = fixture(t, { override: argv => argv[2] === 'checks'
+      ? { status: 0, stdout } : undefined });
+    await assert.rejects(publish(f.options));
+    assert.equal(mutations(f.calls, 'merge').length, 0);
+  }
 });
 
 test('check fallido o ausente impide merge', async t => {
