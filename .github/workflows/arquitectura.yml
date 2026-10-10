@@ -94,3 +94,9 @@ jobs:
         run: node .yod-atlas/scripts/verificar-impacto.cjs --model .yod-atlas/docs/arquitectura/modelo.json --base "$BASE_SHA" --head "$HEAD_SHA" --repo "$GITHUB_REPOSITORY"
       - name: Verificar publicación con dobles sin red
         run: node --test tests/publicar-metricas.test.cjs
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Contratos de leads y preservación de atribución, sin red
+        run: python3 -m unittest discover -s tests -p leads_metricas_test.py -v
