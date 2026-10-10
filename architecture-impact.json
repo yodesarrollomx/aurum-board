@@ -1,7 +1,7 @@
 {
   "model_revision": "2026-10-01.2",
   "proposal_id": "CHG-PUBLICADORES-APP-001",
-  "summary": "Crear los PR de métricas con un token de instalación de App separado, acotado al repositorio, y conservar Actions para push de rama, guard manual, checks obligatorios, merge protegido y Pages. Detectar no-op antes de acuñar el token y esperar rollups vacíos sin aprobarlos.",
+  "summary": "Crear los PR de métricas con un token de instalación de App separado, acotado al repositorio, y conservar Actions para push de rama, guard manual, checks obligatorios, merge protegido y Pages. Detectar no-op antes de acuñar el token y esperar rollups vacíos sin aprobarlos. Conserva la foto de métricas recuperada y la corrección de lectura honesta del colector integradas posteriormente.",
   "components": [
     "SYS-MARKETING",
     "EXT-ACTIONS",
@@ -10,7 +10,8 @@
   "tests": [
     "git diff --check",
     "node --test tests/publicar-metricas.test.cjs: separación de tokens, no-op, credenciales ausentes, rollup vacío, guard por SHA exacto y rechazo sin bypass",
-    "Verificación local del workflow: configuración antes de generar, token sólo con cambios, permisos y alcance mínimo"
+    "Verificación local del workflow: configuración antes de generar, token sólo con cambios, permisos y alcance mínimo",
+    "python3 -m unittest discover -s tests -p leads_metricas_test.py -v (6 contratos sin red)"
   ],
   "rollback": "Revertir el commit de este cambio mediante revisión y repetir las verificaciones locales. No borrar ni restaurar registros de negocio, Sheets o archivos de clientes como parte del rollback."
 }

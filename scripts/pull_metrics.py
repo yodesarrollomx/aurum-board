@@ -73,7 +73,7 @@ def fetch_leads_utm():
     """Devuelve (leads, hubo_falla). El segundo valor importa: si un iman se cayo
     no podemos distinguir 'no hay leads' de 'no pude preguntar', y blanquear la
     atribucion por un timeout borraria leads ya ganados del board."""
-    out, falla = [], False
+    out, falla = [], 'arquitectura' not in BOARD_URLS
     for nombre, url in BOARD_URLS.items():
         u = url   # cada iman ya trae su recurso: board (abierto) o leads (con token)
         for intento in range(3):
@@ -81,6 +81,10 @@ def fetch_leads_utm():
                 req = urllib.request.Request(u, method="GET")
                 with urllib.request.urlopen(req, timeout=30) as r:
                     j = json.loads(r.read())
+                if not isinstance(j, dict) or j.get('ok') is False or j.get('error'):
+                    raise ValueError('el backend de leads rechazó la lectura')
+                if not isinstance(j.get('leads_utm'), list):
+                    raise ValueError('el backend no entregó el contrato leads_utm')
                 # se arma aparte y solo se suma al final: si algo truena a medio
                 # camino, el reintento no vuelve a contar lo que ya iba contado
                 parcial = [l for l in (j.get("leads_utm") or []) if l.get("utm_campaign")]
@@ -418,7 +422,7 @@ def main():
     # Si el iman no respondio y antes SI habia atribucion, conservamos la de la
     # corrida anterior: un timeout no puede borrar leads ya ganados del board.
     prev_por_id = {p.get("id"): p for p in (prev_full or {}).get("posts", [])}
-    conservar = (leads_falla and not leads_utm_activo
+    conservar = (leads_falla
                  and bool((prev_full or {}).get("leads_utm_activo")))
     if conservar:
         print("  ! consulta de leads fallida: conservo la atribucion de la corrida anterior")
@@ -482,12 +486,13 @@ def main():
     # El desglose por pieza se calculaba y se tiraba: sin sacarlo, dos publicaciones
     # del mismo dia seguian mostrando la misma bolsa de leads. Se publica aparte para
     # que el board pueda desagregar (falta amarrar cada tarjeta con su pieza).
-    leads_por_pieza = {k.split("|", 1)[1]: v for k, v in (campanas or {}).items() if "|" in k}
+    leads_por_pieza = ((prev_full or {}).get("leads_por_pieza") or {}) if conservar else {
+        k.split("|", 1)[1]: v for k, v in (campanas or {}).items() if "|" in k}
     # "pagina"/"ig_id" quedan por compatibilidad (apuntan a la cuenta principal);
     # "cuentas" es la lista completa, que es lo que la galeria usa para filtrar.
     out = {"generado": stamp, "pagina": cuentas[0]["nombre"], "ig_id": cuentas[0]["ig_id"],
            "cuentas": [{"clave": c["clave"], "nombre": c["nombre"]} for c in cuentas], "posts": posts,
-           "leads_por_pieza": leads_por_pieza, "leads_medicion_caida": bool(conservar),
+           "leads_por_pieza": leads_por_pieza, "leads_medicion_caida": bool(leads_falla),
            "semana": semana, "dias_sin_publicar": dias_sin_publicar, "leads_utm_activo": leads_utm_activo}
     with open(os.path.join(BASE, "metrics.json"), "w") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
