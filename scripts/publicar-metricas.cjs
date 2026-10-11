@@ -11,7 +11,7 @@ const COMPONENTS = ['SYS-MARKETING', 'GAS-MARKETING', 'SHEET-MARKETING'];
 function execute(argv, options = {}) {
   const result = spawnSync(argv[0], argv.slice(1), {
     encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024,
-    cwd: options.cwd, input: options.input,
+    cwd: options.cwd, input: options.input, env: options.env,
   });
   if (result.error) throw new Error(`No se pudo ejecutar ${argv[0]} ${argv[1] || ''}.`);
   return { status: result.status, stdout: result.stdout || '' };
@@ -38,30 +38,40 @@ async function publish(options = {}) {
   const waitMs = options.waitMs === undefined ? 15 * 60 * 1000 : options.waitMs;
   const intervalMs = options.intervalMs === undefined ? 15000 : options.intervalMs;
   const repo = env.GITHUB_REPOSITORY;
+  // La credencial de la App sólo entra en el proceso que crea el PR.
+  const commandEnv = { ...env };
+  delete commandEnv.PR_CREATION_TOKEN;
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo || '') ||
       !/^\d+$/.test(env.GITHUB_RUN_ID || '') || !/^\d+$/.test(env.GITHUB_RUN_ATTEMPT || '')) {
     throw new Error('Se requiere el contexto de una corrida de GitHub Actions.');
   }
 
-  function command(argv, allowed = [0], input) {
-    const result = exec(argv, { cwd, input });
+  function command(argv, allowed = [0], input, token) {
+    const result = exec(argv, { cwd, input,
+      env: token === undefined ? commandEnv : { ...commandEnv, GH_TOKEN: token } });
     if (!allowed.includes(result.status)) {
       // No imprimir stderr ni el cuerpo remoto: pueden contener datos o credenciales.
       throw new Error(`Falló ${argv[0]} ${argv[1] || ''} (salida ${result.status}).`);
     }
     return result.stdout;
   }
-  function api(endpoint, method = 'GET', body) {
+  function api(endpoint, method = 'GET', body, token) {
     const argv = ['gh', 'api', '--method', method, endpoint];
     if (body !== undefined) argv.push('--input', '-');
-    const output = command(argv, [0], body === undefined ? undefined : JSON.stringify(body));
+    const output = command(argv, [0], body === undefined ? undefined : JSON.stringify(body), token);
     return output.trim() ? JSON.parse(output) : null;
   }
 
   const changed = dataPaths(command(['git', 'status', '--porcelain=v1', '--untracked-files=all', '-z']));
+  if (options.checkOnly) return { changed: changed.length > 0 };
   if (!changed.length) {
     log('Sin cambios de métricas o portadas.');
     return { changed: false };
+  }
+  const prCreationToken = env.PR_CREATION_TOKEN;
+  if (!env.GH_TOKEN || !env.GH_TOKEN.trim() || !prCreationToken || !prCreationToken.trim()
+      || prCreationToken === env.GH_TOKEN || prCreationToken === env.GITHUB_TOKEN) {
+    throw new Error('Se requieren GH_TOKEN de Actions y PR_CREATION_TOKEN de la App como credenciales distintas. No se publica.');
   }
   const metrics = JSON.parse(fs.readFileSync(path.join(cwd, 'metrics.json'), 'utf8'));
   if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) {
@@ -111,7 +121,7 @@ async function publish(options = {}) {
         + 'La integración espera el guard del atlas sobre el commit exacto y las comprobaciones obligatorias. '
         + 'No modifica las fuentes ni sus credenciales.\n\n'
         + 'Rollback: revertir este commit mediante PR si una revisión confirma un error; conservar el historial.',
-    });
+    }, prCreationToken);
     if (!Number.isSafeInteger(pr && pr.number)) throw new Error('GitHub no devolvió un PR válido.');
     log(`PR #${pr.number} creado; pendiente de validación.`);
     const deadline = now() + waitMs;
@@ -142,8 +152,15 @@ async function publish(options = {}) {
 
     let checksReady = false;
     while (now() < deadline) {
-      const checks = JSON.parse(command(['gh', 'pr', 'checks', String(pr.number), '--repo', repo,
-        '--required', '--json', 'name,bucket,workflow'], [0, 1, 8]));
+      const output = command(['gh', 'pr', 'checks', String(pr.number), '--repo', repo,
+        '--required', '--json', 'name,bucket,workflow'], [0, 1, 8]);
+      const checks = output.trim() ? JSON.parse(output) : [];
+      // El rollup puede tardar en aparecer después de crear el PR. Vacío nunca
+      // significa aprobado: conservar el límite de espera y todos los checks.
+      if (Array.isArray(checks) && !checks.length) {
+        await sleep(intervalMs);
+        continue;
+      }
       if (!Array.isArray(checks) || !checks.some(check => check.name === 'Arquitectura YOD')) {
         throw new Error('Falta configurar el check obligatorio Arquitectura YOD.');
       }
@@ -179,7 +196,10 @@ async function publish(options = {}) {
 }
 
 if (require.main === module) {
-  publish().catch(error => { console.error(error.message); process.exitCode = 1; });
+  const checkOnly = process.argv.includes('--check-changes');
+  publish({ checkOnly, ...(checkOnly ? { log: () => {} } : {}) })
+    .then(result => { if (checkOnly) console.log(`changed=${result.changed}`); })
+    .catch(error => { console.error(error.message); process.exitCode = 1; });
 }
 
 module.exports = { publish, dataPaths };
