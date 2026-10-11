@@ -1,16 +1,16 @@
 {
   "model_revision": "2026-09-30.1",
-  "proposal_id": "CHG-ATLAS-001",
-  "summary": "Cumplir la lectura honesta del tablero: rechazos HTTP 200 y respuestas sin contrato no representan cero leads. Si un imán falla se conserva la atribución acreditada por publicación y pieza, y se señala la medición incompleta, incluso cuando todavía no existe atribución previa. No cambia el cálculo de conversiones, permisos ni endpoints. Se incorpora un diagnóstico manual de presencia de conexiones: GitHub evalúa booleanos y el proceso no recibe valores de secretos. No modifica credenciales, datos ni permisos.",
+  "proposal_id": "CHG-METRICS-001",
+  "summary": "Actualizar métricas agregadas y portadas generadas; corrida 38139596880, intento 1. Se conservan contratos y fuentes.",
   "components": [
-    "SYS-MARKETING"
+    "SYS-MARKETING",
+    "GAS-MARKETING",
+    "SHEET-MARKETING"
   ],
   "tests": [
-    "git diff --check",
+    "JSON.parse de metrics.json antes de crear el commit.",
     "node --test tests/publicar-metricas.test.cjs",
-    "python3 -m unittest discover -s tests -p leads_metricas_test.py -v: rechazo HTTP 200, contrato ausente, vacío real, imán sin configuración, campañas válidas y fallo parcial con atribución previa; sin red.",
-    "Regresión previa reproducida en diagnóstico privado sobre c2a5ff4: rechazo leído como cero y atribución parcial que reemplaza la anterior.",
-    "Diagnóstico real 38133442115: indicadores de presencia ejecutados sin valores de secretos, sin llamadas comerciales ni escrituras."
+    "Guard arquitectónico sobre base_sha y head_sha exactos antes del merge."
   ],
-  "rollback": "Revertir por PR el colector y sus pruebas; conservar métricas previas, portadas, formularios y registros del CRM. No borrar ni reiniciar históricos. El diagnóstico puede retirarse revirtiendo únicamente su workflow; no elimina ni rota las credenciales."
+  "rollback": "Revertir mediante PR el commit de datos si la revisión confirma un error. Conservar historial y credenciales; no reejecutar escrituras en fuentes para deshacer una publicación."
 }
