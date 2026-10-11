@@ -45,7 +45,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: yodesarrollomx/yod-portal
-          ref: 93afbea366c19872bfb855463afece2ac73eeb08
+          ref: 16390c54873393d590793a4407cf05dbcd2f2bb1
           path: .yod-atlas
           persist-credentials: false
           sparse-checkout-cone-mode: false
@@ -99,7 +99,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Contratos de leads y preservación de atribución, sin red
-        run: python3 -m unittest discover -s tests -p leads_metricas_test.py -v
+        run: |
+          python3 -m unittest discover -s tests -p leads_metricas_test.py -v
+          python3 -m unittest discover -s tests -p plan_online_test.py -v
 
       - name: Snapshots privados y lectura de métricas por hash
         run: |

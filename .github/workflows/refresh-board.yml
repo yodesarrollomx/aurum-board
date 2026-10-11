@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: [scripts/snapshots_online.py, metrics-online.js, .github/workflows/refresh-board.yml]
+    paths: [scripts/pull_metrics.py, scripts/snapshots_online.py, metrics-online.js, .github/workflows/refresh-board.yml]
 
 # concurrencia: nunca dos corridas escribiendo a la vez
 concurrency:
@@ -77,6 +77,7 @@ jobs:
         if: steps.tok.outputs.hay == 'si'
         run: |
           python3 -m json.tool metrics.json >/dev/null
+          python3 -m unittest discover -s tests -p plan_online_test.py
           python3 -m unittest discover -s tests -p leads_metricas_test.py
           python3 -m unittest discover -s tests -p snapshots_online_test.py
           node --test tests/*.cjs

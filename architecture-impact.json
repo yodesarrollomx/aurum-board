@@ -1,18 +1,25 @@
 {
-  "model_revision": "2026-10-11.sala-online",
-  "proposal_id": "CHG-SALA-ONLINE-20261011",
-  "summary": "Mantener el código del board en Pages/main por PR y CI; actualizar métricas públicas y portadas desde rama exclusiva de datos con SHA256 y recibo exacto, usando identidad nativa y almacenamiento de versiones draft privado. Ante fallo el cliente conserva la última lectura. No se cambia la configuración de Pages ni el cálculo de atribuciones/leads. Se identifica el draft por kind/repo/schema/hash aunque GitHub renombre su tag; al actualizar se preservan draft, tag e intento del productor. La primera ejecución publicó 76 posts y su recibo; se conserva el backup preparado tras el fallo de identificación.",
+  "model_revision": "2026-10-11.plan-agregados-online",
+  "proposal_id": "CHG-PLAN-AGREGADOS-ONLINE-20261011",
+  "summary": "Consumir únicamente agregados de Plan con recibo/hash/frescura, reconciliar cantidades sin expandir leads, conservar atribución ante fallos y registrar fuente/histórico. Configuración y credenciales privadas permanecen en Sala; Arquitectura mantiene su contrato de máquina.",
   "components": [
+    "SYS-YOD-OS",
+    "SYS-SALA",
+    "SVC-SALA-PRODUCTOR",
+    "SVC-SALA-EJECUTOR",
     "SYS-MARKETING",
-    "EXT-ACTIONS"
+    "SYS-PLAN-POTENCIAL",
+    "GAS-PLAN-POTENCIAL",
+    "SHEET-PLAN-POTENCIAL",
+    "SHEET-CRM",
+    "EXT-ACTIONS",
+    "EXT-DRIVE"
   ],
   "tests": [
-    "git diff --check",
-    "node --test tests/*.cjs",
-    "python3 -m unittest discover -s tests -p '*_test.py'",
-    "Prueba real 38138596609: draft privado y bytes recuperados; cambio de Pages rechazado HTTP403. No se fuerza ni se altera Administration.",
-    "Publicación real de rama de agregados y recibo pendiente de merge normal.",
-    "26 contratos de snapshot, incluida identificación de drafts untagged, aislamiento de drafts ajenos y recuperación de mutex caducado."
+    "Lectura real y privada de metadatos/encabezados confirma correspondencia con la hoja canónica; comprobar por separado la autoridad del servicio.",
+    "Dobles: lectura por columnas permitidas, cabeceras exactas, folios duplicados/rechazados, pruebas excluidas y cita sólo con confirmación registrada; sin PII o IDs privados en el DTO.",
+    "Snapshot/recibo: hash exacto del archivo de agregados; consumidor rechaza recibos incompletos, corruptos o desactualizados y conserva último dato acreditado.",
+    "Regresiones completas de Sala y leads/publicación Marketing; arquitectura central y CI obligatorios; ninguna escritura de prueba en hojas/CRM."
   ],
-  "rollback": "Revertir por PR el lector y el workflow, conservando métricas, portadas, ramas y snapshots. La publicación Git anterior exige resolver identidad/CI antes de habilitarla. No borrar atribuciones ni registros del CRM."
+  "rollback": "Revertir PR de lectura y consumidor; mantener los últimos snapshots confirmados y las hojas intactas. Retirar sólo el permiso lector específico si se añadió para esta ruta; no borrar CRM, medios o historial."
 }
