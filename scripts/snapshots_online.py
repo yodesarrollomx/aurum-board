@@ -498,10 +498,11 @@ class Snapshots:
         body = {"schema": SCHEMA, "repo": self.repo, "kind": KIND, "state": "prepared",
                 "process": process, "source_sha": source, "parent_id": state["parent_id"],
                 "archive_sha256": digest(raw), "data_sha": manifest["data_sha"],
-                "asset_id": asset["id"], "lease": state["lease"], "run_id": self.run}
+                "asset_id": asset["id"], "lease": state["lease"], "run_id": self.run,
+                "attempt": self.attempt}
         self.api.request("releases/" + str(release["id"]),
                          {"body": canonical(body).decode(), "draft": True,
-                          "tag_name": PREFIX + body["run_id"] + "-" + self.attempt + "-" + body["process"]}, method="PATCH")
+                          "tag_name": PREFIX + body["run_id"] + "-" + str(body.get("attempt", self.attempt)) + "-" + body["process"]}, method="PATCH")
         if digest(self.api.asset(asset["id"])) != body["archive_sha256"]:
             raise OnlineError("El snapshot subido no coincide")
         state.update({"prepared_id": release["id"], "data_sha": body["data_sha"]})

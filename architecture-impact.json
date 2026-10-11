@@ -1,7 +1,7 @@
 {
   "model_revision": "2026-10-11.sala-online",
   "proposal_id": "CHG-SALA-ONLINE-20261011",
-  "summary": "Mantener el código del board en Pages/main por PR y CI; actualizar métricas públicas y portadas desde rama exclusiva de datos con SHA256 y recibo exacto, usando identidad nativa y almacenamiento de versiones draft privado. Ante fallo el cliente conserva la última lectura. No se cambia la configuración de Pages ni el cálculo de atribuciones/leads.",
+  "summary": "Mantener el código del board en Pages/main por PR y CI; actualizar métricas públicas y portadas desde rama exclusiva de datos con SHA256 y recibo exacto, usando identidad nativa y almacenamiento de versiones draft privado. Ante fallo el cliente conserva la última lectura. No se cambia la configuración de Pages ni el cálculo de atribuciones/leads. Se identifica el draft por kind/repo/schema/hash aunque GitHub renombre su tag; al actualizar se preservan draft, tag e intento del productor. La primera ejecución publicó 76 posts y su recibo; se conserva el backup preparado tras el fallo de identificación.",
   "components": [
     "SYS-MARKETING",
     "EXT-ACTIONS"
@@ -11,7 +11,8 @@
     "node --test tests/*.cjs",
     "python3 -m unittest discover -s tests -p '*_test.py'",
     "Prueba real 38138596609: draft privado y bytes recuperados; cambio de Pages rechazado HTTP403. No se fuerza ni se altera Administration.",
-    "Publicación real de rama de agregados y recibo pendiente de merge normal."
+    "Publicación real de rama de agregados y recibo pendiente de merge normal.",
+    "26 contratos de snapshot, incluida identificación de drafts untagged, aislamiento de drafts ajenos y recuperación de mutex caducado."
   ],
   "rollback": "Revertir por PR el lector y el workflow, conservando métricas, portadas, ramas y snapshots. La publicación Git anterior exige resolver identidad/CI antes de habilitarla. No borrar atribuciones ni registros del CRM."
 }
