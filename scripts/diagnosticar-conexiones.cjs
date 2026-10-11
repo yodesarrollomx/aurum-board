@@ -27,6 +27,12 @@ async function publisher(){
   result.expected_owner=j?.owner?.login==='yodesarrollomx';
   result.expected_permissions=j?.permissions?.contents==='read'&&j?.permissions?.pull_requests==='write'&&
     Object.entries(j?.permissions||{}).every(([p,v])=>['contents','pull_requests','metadata'].includes(p)||v==='none');
+  if(result.identity_verified&&result.expected_owner&&result.expected_permissions){
+   const repos=['sala-edicion','aurum-board'];
+   const installations=await Promise.all(repos.map(repo=>read('https://api.github.com/repos/yodesarrollomx/'+repo+'/installation',token)));
+   result.repository_installations_verified=installations.every(x=>x.http===200&&x.data?.account?.login==='yodesarrollomx'&&x.data?.repository_selection==='selected');
+   result.same_installation=installations.length===2&&Number.isInteger(installations[0].data?.id)&&installations[0].data.id===installations[1].data?.id;
+  }
  }catch{result.identity_verified=false;result.code='app_auth_not_verified';}
  return result;
 }
@@ -48,7 +54,7 @@ async function publisher(){
     qaa?'leads&token='+encodeURIComponent(qaa):'board'))};
  report.potencial={machine_auth_sent:false,...await backend(
   'https://script.google.com/macros/s/AKfycbw3EB-6Q9Mq-ouDU-JvKMrRUaw4auYVeGkKja783yJ7_dEpCOW8xoMhs8IQMDojmlDB3A/exec?recurso=board')};
- report.connections_complete=report.meta.authorized===true&&report.arquitectura.leads_contract_verified&&report.potencial.leads_contract_verified&&report.publisher_app.identity_verified===true;
+ report.connections_complete=report.meta.authorized===true&&report.arquitectura.leads_contract_verified&&report.potencial.leads_contract_verified&&report.publisher_app.identity_verified===true&&report.publisher_app.expected_owner===true&&report.publisher_app.expected_permissions===true&&report.publisher_app.repository_installations_verified===true&&report.publisher_app.same_installation===true;
  console.log(JSON.stringify(report));
  if(!report.connections_complete)process.exitCode=2;
 })().catch(()=>{console.log(JSON.stringify({ok:false,code:'connection_check_failed',business_writes:0}));process.exitCode=1;});
