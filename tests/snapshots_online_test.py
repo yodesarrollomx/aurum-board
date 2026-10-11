@@ -290,6 +290,31 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse((bundle / "mesa.log").exists())
         self.assertFalse((bundle / "secreto.json").exists())
 
+    def test_untagged_draft_is_identified_by_kind_and_hash(self):
+        out, release = self.prepare()
+        self.api.releases[release["id"]]["tag_name"] = "untagged-github-generated"
+        observed = self.api.request("releases/" + str(release["id"]))
+        self.s.validate_release(observed, json.loads(observed["body"]))
+
+    def test_unrelated_draft_does_not_become_a_snapshot(self):
+        self.api.releases[999] = {"id": 999, "draft": True, "tag_name": "untagged-human",
+                                  "body": "Notas privadas de otra publicación"}
+        self.assertEqual(self.s.latest(), (None, None))
+
+    def test_expired_lease_can_recover_without_old_run(self):
+        before = self.s.state()["lease"]
+        info = json.loads(self.api.commits[before]["message"])
+        info["expires"] = 0
+        self.api.commits[before]["message"] = json.dumps(info)
+        original = self.api.request
+        def guarded(path, *args, **kwargs):
+            if path.startswith("actions/runs/"):
+                raise AssertionError("No consultar un run desaparecido para un mutex caducado")
+            return original(path, *args, **kwargs)
+        with patch.object(self.api, "request", side_effect=guarded):
+            self.s.acquire("relevo")
+        self.assertNotEqual(self.s.state()["lease"], before)
+
     def test_release_preserves_history(self):
         before = self.s.state()["lease"]
         self.s.release()

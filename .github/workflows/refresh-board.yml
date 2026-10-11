@@ -90,6 +90,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/snapshots_online.py publicar-raw
+      - name: Comprobar el lector real con el recibo y los datos publicados
+        if: steps.tok.outputs.hay == 'si'
+        run: |
+          node -e "require('./metrics-online.js').load().then(r=>console.log('LECTOR_ONLINE '+JSON.stringify({ok:true,posts:r.metrics.posts.length,run_id:r.receipt.run_id,data_sha:r.receipt.data_sha}))).catch(e=>{console.error(e.message);process.exitCode=1})"
       - name: Liberar mutex
         if: always()
         env:

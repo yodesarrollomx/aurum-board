@@ -26,6 +26,7 @@ SCHEMA = 1
 SHA = re.compile(r"^[0-9a-f]{40}$")
 DIGEST = re.compile(r"^[0-9a-f]{64}$")
 PREFIX = "yod-online-"
+KIND = "yod-online-public-data"
 LOCK_REF = "heads/runtime/online-data-lease"
 MAX_ZIP = 100 * 1024 * 1024
 MAX_PLAIN = 500 * 1024 * 1024
@@ -389,19 +390,21 @@ class Snapshots:
                 break
         found = []
         for release in releases:
-            if not release.get("draft") or not release.get("tag_name", "").startswith(PREFIX):
+            if not release.get("draft"):
                 continue
             try:
                 body = json.loads(release["body"] or "")
             except ValueError:
-                raise OnlineError("Snapshot privado sin contrato") from None
+                continue
+            if not isinstance(body, dict) or body.get("kind") != KIND:
+                continue
             if body.get("schema") == SCHEMA and body.get("repo") == self.repo and body.get("state") == "published":
                 self.validate_release(release, body)
                 found.append((release, body))
         return max(found, key=lambda r: r[0]["id"]) if found else (None, None)
 
     def validate_release(self, release, body):
-        if (not release.get("draft") or not release.get("tag_name", "").startswith(PREFIX)
+        if (not release.get("draft") or body.get("kind") != KIND
                 or body.get("schema") != SCHEMA or body.get("repo") != self.repo
                 or body.get("state") not in ("prepared", "published")
                 or not SHA.fullmatch(str(body.get("source_sha", "")))
@@ -490,14 +493,15 @@ class Snapshots:
             "tag_name": PREFIX + self.run + "-" + self.attempt + "-" + process,
             "target_commitish": source, "name": "Datos online " + process,
             "draft": True, "body": canonical({"schema": SCHEMA, "repo": self.repo,
-                                            "state": "uploading"}).decode()})
+                                            "state": "uploading", "kind": KIND}).decode()})
         asset = self.api.upload(release, raw)
-        body = {"schema": SCHEMA, "repo": self.repo, "state": "prepared",
+        body = {"schema": SCHEMA, "repo": self.repo, "kind": KIND, "state": "prepared",
                 "process": process, "source_sha": source, "parent_id": state["parent_id"],
                 "archive_sha256": digest(raw), "data_sha": manifest["data_sha"],
                 "asset_id": asset["id"], "lease": state["lease"], "run_id": self.run}
         self.api.request("releases/" + str(release["id"]),
-                         {"body": canonical(body).decode()}, method="PATCH")
+                         {"body": canonical(body).decode(), "draft": True,
+                          "tag_name": PREFIX + body["run_id"] + "-" + self.attempt + "-" + body["process"]}, method="PATCH")
         if digest(self.api.asset(asset["id"])) != body["archive_sha256"]:
             raise OnlineError("El snapshot subido no coincide")
         state.update({"prepared_id": release["id"], "data_sha": body["data_sha"]})
