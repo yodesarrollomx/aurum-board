@@ -3,6 +3,7 @@ on:
   push:
     branches: [codex/sala-accesos-20261011]
     paths: ['.github/workflows/sala-access-discovery.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -13,31 +14,70 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Comprobar nombres y formatos sin usar ni mostrar valores
+      - name: Comprobar presencia sin entregar secretos al proceso
         env:
-          YOD_ACCESS_SECRETS: ${{ toJSON(secrets) }}
-          YOD_ACCESS_VARIABLES: ${{ toJSON(vars) }}
+          PRESENT_SECRET_YOD_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.YOD_PUBLISHER_APP_PRIVATE_KEY != '' }}
+          PRESENT_SECRET_YOD_PUBLISHER_APP_ID: ${{ secrets.YOD_PUBLISHER_APP_ID != '' }}
+          PRESENT_SECRET_YOD_APP_ID: ${{ secrets.YOD_APP_ID != '' }}
+          PRESENT_SECRET_YOD_APP_KEY: ${{ secrets.YOD_APP_KEY != '' }}
+          PRESENT_SECRET_YOD_GITHUB_APP_ID: ${{ secrets.YOD_GITHUB_APP_ID != '' }}
+          PRESENT_SECRET_YOD_GITHUB_APP_PRIVATE_KEY: ${{ secrets.YOD_GITHUB_APP_PRIVATE_KEY != '' }}
+          PRESENT_SECRET_GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID != '' }}
+          PRESENT_SECRET_GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY != '' }}
+          PRESENT_SECRET_GH_APP_ID: ${{ secrets.GH_APP_ID != '' }}
+          PRESENT_SECRET_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY != '' }}
+          PRESENT_SECRET_YOD_PUBLISHER_TOKEN: ${{ secrets.YOD_PUBLISHER_TOKEN != '' }}
+          PRESENT_SECRET_YOD_GITHUB_TOKEN: ${{ secrets.YOD_GITHUB_TOKEN != '' }}
+          PRESENT_SECRET_SALA_GITHUB_TOKEN: ${{ secrets.SALA_GITHUB_TOKEN != '' }}
+          PRESENT_SECRET_GH_TOKEN: ${{ secrets.GH_TOKEN != '' }}
+          PRESENT_SECRET_GH_PAT: ${{ secrets.GH_PAT != '' }}
+          PRESENT_SECRET_GITHUB_PAT: ${{ secrets.GITHUB_PAT != '' }}
+          PRESENT_SECRET_PAT_TOKEN: ${{ secrets.PAT_TOKEN != '' }}
+          PRESENT_SECRET_PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN != '' }}
+          PRESENT_SECRET_YOD_APPS_SCRIPT_OAUTH: ${{ secrets.YOD_APPS_SCRIPT_OAUTH != '' }}
+          PRESENT_SECRET_CLASP_TOKEN: ${{ secrets.CLASP_TOKEN != '' }}
+          PRESENT_SECRET_CLASPRC_JSON: ${{ secrets.CLASPRC_JSON != '' }}
+          PRESENT_SECRET_APPS_SCRIPT_OAUTH: ${{ secrets.APPS_SCRIPT_OAUTH != '' }}
+          PRESENT_SECRET_SALA_SCRIPT_ID: ${{ secrets.SALA_SCRIPT_ID != '' }}
+          PRESENT_SECRET_QAA_SCRIPT_ID: ${{ secrets.QAA_SCRIPT_ID != '' }}
+          PRESENT_SECRET_PLAN_SCRIPT_ID: ${{ secrets.PLAN_SCRIPT_ID != '' }}
+          PRESENT_SECRET_APPS_SCRIPT_PROJECTS: ${{ secrets.APPS_SCRIPT_PROJECTS != '' }}
+          PRESENT_SECRET_GDRIVE_SA_JSON: ${{ secrets.GDRIVE_SA_JSON != '' }}
+          PRESENT_SECRET_SALA_GAS_EXEC: ${{ secrets.SALA_GAS_EXEC != '' }}
+          PRESENT_SECRET_SALA_CLAVE_AGENTE: ${{ secrets.SALA_CLAVE_AGENTE != '' }}
+          PRESENT_SECRET_YOD_META_TOKEN: ${{ secrets.YOD_META_TOKEN != '' }}
+          PRESENT_SECRET_AURUM_QAA_TOKEN: ${{ secrets.AURUM_QAA_TOKEN != '' }}
+          PRESENT_SECRET_PLAN_POTENCIAL_TOKEN: ${{ secrets.PLAN_POTENCIAL_TOKEN != '' }}
+          PRESENT_SECRET_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY != '' }}
+          PRESENT_SECRET_HF_TOKEN: ${{ secrets.HF_TOKEN != '' }}
+          PRESENT_SECRET_MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID != '' }}
+          PRESENT_SECRET_MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET != '' }}
+          PRESENT_VARIABLE_YOD_PUBLISHER_APP_ID: ${{ vars.YOD_PUBLISHER_APP_ID != '' }}
+          PRESENT_VARIABLE_YOD_APP_ID: ${{ vars.YOD_APP_ID != '' }}
+          PRESENT_VARIABLE_YOD_GITHUB_APP_ID: ${{ vars.YOD_GITHUB_APP_ID != '' }}
+          PRESENT_VARIABLE_GITHUB_APP_ID: ${{ vars.GITHUB_APP_ID != '' }}
+          PRESENT_VARIABLE_GH_APP_ID: ${{ vars.GH_APP_ID != '' }}
+          PRESENT_VARIABLE_YOD_PUBLISHER_TOKEN: ${{ vars.YOD_PUBLISHER_TOKEN != '' }}
+          PRESENT_VARIABLE_YOD_GITHUB_TOKEN: ${{ vars.YOD_GITHUB_TOKEN != '' }}
+          PRESENT_VARIABLE_SALA_GITHUB_TOKEN: ${{ vars.SALA_GITHUB_TOKEN != '' }}
+          PRESENT_VARIABLE_GH_TOKEN: ${{ vars.GH_TOKEN != '' }}
+          PRESENT_VARIABLE_PAT_TOKEN: ${{ vars.PAT_TOKEN != '' }}
+          PRESENT_VARIABLE_PERSONAL_ACCESS_TOKEN: ${{ vars.PERSONAL_ACCESS_TOKEN != '' }}
+          PRESENT_VARIABLE_CLASP_TOKEN: ${{ vars.CLASP_TOKEN != '' }}
+          PRESENT_VARIABLE_SALA_SCRIPT_ID: ${{ vars.SALA_SCRIPT_ID != '' }}
+          PRESENT_VARIABLE_QAA_SCRIPT_ID: ${{ vars.QAA_SCRIPT_ID != '' }}
+          PRESENT_VARIABLE_PLAN_SCRIPT_ID: ${{ vars.PLAN_SCRIPT_ID != '' }}
+          PRESENT_VARIABLE_APPS_SCRIPT_PROJECTS: ${{ vars.APPS_SCRIPT_PROJECTS != '' }}
+          PRESENT_VARIABLE_YOD_META_TOKEN: ${{ vars.YOD_META_TOKEN != '' }}
+          PRESENT_VARIABLE_AURUM_QAA_TOKEN: ${{ vars.AURUM_QAA_TOKEN != '' }}
+          PRESENT_VARIABLE_PLAN_POTENCIAL_TOKEN: ${{ vars.PLAN_POTENCIAL_TOKEN != '' }}
+          PRESENT_VARIABLE_HF_TOKEN: ${{ vars.HF_TOKEN != '' }}
+          PRESENT_VARIABLE_MODAL_TOKEN_ID: ${{ vars.MODAL_TOKEN_ID != '' }}
+          PRESENT_VARIABLE_MODAL_TOKEN_SECRET: ${{ vars.MODAL_TOKEN_SECRET != '' }}
         shell: bash
         run: |
           node --input-type=module <<'NODE'
-          const secrets=JSON.parse(process.env.YOD_ACCESS_SECRETS||'{}');
-          const vars=JSON.parse(process.env.YOD_ACCESS_VARIABLES||'{}');
-          const relevant=/SALA|GAS|SCRIPT|CLASP|GDRIVE|APP|PUBLISH|^GH_|GITHUB_PAT|YOD|QAA|POTENCIAL/i;
-          const names=Object.keys(secrets).filter(x=>relevant.test(x)).sort();
-          const report={at:new Date().toISOString(),mode:'read_only',businessWrites:0,secretNames:names,variableNames:Object.keys(vars).filter(x=>relevant.test(x)).sort(),credentialShapes:[],scriptCandidates:[]};
-          for(const name of names){
-           const value=secrets[name];let json;try{json=JSON.parse(value);}catch{}
-           report.credentialShapes.push({name,present:!!value,privateKey:/^-----BEGIN (RSA )?PRIVATE KEY-----/.test(value),numericId:/^\d+$/.test(value),jsonKeys:json&&typeof json==='object'&&!Array.isArray(json)?Object.keys(json).sort():null});
-          }
-          function scan(value,source,depth=0){
-           if(depth>5)return;
-           if(typeof value==='string'){
-            for(const m of value.matchAll(/script\.google\.com\/(?:home\/projects\/|d\/)([A-Za-z0-9_-]{20,200})/g))report.scriptCandidates.push({scriptId:m[1],source});
-            if(/(?:script_?id|scriptId)$/i.test(source.split('.').at(-1))&&/^[A-Za-z0-9_-]{30,200}$/.test(value)&&!value.startsWith('AKfy'))report.scriptCandidates.push({scriptId:value,source});
-            if(depth===0&&value.length<65536){try{scan(JSON.parse(value),source,depth+1);}catch{}}
-           }else if(value&&typeof value==='object')for(const[k,v]of Object.entries(value))scan(v,source+'.'+k,depth+1);
-          }
-          for(const[name,value]of Object.entries({...secrets,...vars}))if(/SCRIPT|GAS|CLASP|CONFIG|PROJECT/i.test(name))scan(value,name);
-          console.log(JSON.stringify(report));
-          
+          const flags=Object.entries(process.env).filter(([name])=>name.startsWith('PRESENT_'));
+          const present=flags.filter(([,value])=>value==='true').map(([name])=>name.slice(8)).sort();
+          console.log(JSON.stringify({mode:'presence_only',businessWrites:0,checked:flags.length,present,secretValuesReceived:false}));
           NODE
