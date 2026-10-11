@@ -1,0 +1,34 @@
+name: Marketing · comprobar conexiones de máquina
+on:
+  push:
+    branches: [codex/marketing-conexiones-20261011]
+    paths: ['scripts/diagnosticar-conexiones.cjs', '.github/workflows/conexiones.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  comprobar:
+    if: github.repository == 'yodesarrollomx/aurum-board' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Comprobar fuente y contratos sin credenciales
+        run: |
+          node --check scripts/diagnosticar-conexiones.cjs
+          node --test tests/publicar-metricas.test.cjs
+          python3 -m unittest discover -s tests -p leads_metricas_test.py -v
+          git diff --check
+      - name: Lecturas autenticadas, sin publicar ni crear leads
+        env:
+          YOD_META_TOKEN: ${{ secrets.YOD_META_TOKEN }}
+          AURUM_QAA_TOKEN: ${{ secrets.AURUM_QAA_TOKEN }}
+          YOD_APP_ID: ${{ vars.YOD_PUBLISHER_APP_ID }}
+          YOD_APP_KEY: ${{ secrets.YOD_PUBLISHER_APP_PRIVATE_KEY }}
+        run: node scripts/diagnosticar-conexiones.cjs
