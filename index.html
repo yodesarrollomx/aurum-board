@@ -292,6 +292,7 @@ body{padding-top:env(safe-area-inset-top)}
 <main id="app"><p class="muted" style="padding:40px 0;text-align:center;">Cargando board…</p></main>
 <div id="toast"></div>
 
+<script src="metrics-online.js"></script>
 <script>
 (function(){
   "use strict";
@@ -465,13 +466,27 @@ body{padding-top:env(safe-area-inset-top)}
   }
   /* --- metricas de publicaciones (archivo del propio board, mismo origen) --- */
   function fetchMetrics(){
-    var url=CONFIG.METRICS_URL+(CONFIG.METRICS_URL.indexOf("?")<0?"?":"&")+"cb="+Date.now();
-    return fetch(url,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){
-      if(j && j.posts){ METRICS=j; if(DATA) render(); return {ok:true,source:"anuncios"}; }
-      return {ok:false,source:"anuncios",reason:"respuesta_invalida"};
+    return MetricsOnline.load().then(function(result){
+      METRICS=result.metrics;
+      if(DATA)render();
+      return {ok:true,source:"anuncios"};
     }).catch(function(e){
-      console.warn("[board] fetchMetrics falló:",e);
-      return {ok:false,source:"anuncios",reason:e.message};
+      console.warn("[board] lectura de métricas sin confirmar:",e.message);
+      if(METRICS)return {ok:false,source:"anuncios",reason:e.message};
+      // Primer acceso durante el arranque: mostrar respaldo conocido con su fecha.
+      // El respaldo no se presenta como una actualización confirmada.
+      var url=CONFIG.METRICS_URL+"?cb="+Date.now();
+      return fetch(url,{cache:"no-store"}).then(function(r){
+        if(!r.ok)throw new Error("sin respaldo");
+        return r.json();
+      }).then(function(j){
+        if(!j||!Array.isArray(j.posts))throw new Error("respaldo sin contrato");
+        METRICS=j;
+        if(DATA)render();
+        return {ok:false,source:"anuncios",reason:"actualizacion_sin_confirmar"};
+      }).catch(function(){
+        return {ok:false,source:"anuncios",reason:e.message};
+      });
     });
   }
   /* --- embudo Plan de Potencial (2º imán): su PROPIO Apps Script ?recurso=board --- */
@@ -1160,7 +1175,7 @@ body{padding-top:env(safe-area-inset-top)}
     if(F.cuenta==null) F.cuenta='todas';
     var h='<h2 class="sec" id="sec-pubs">Publicaciones · toca una portada para ver su detalle</h2>';
     if(!METRICS || !(METRICS.posts||[]).length){
-      return h+'<p class="nota">Aún sin métricas. Corre <code>pull_metrics.py</code> y sube <code>metrics.json</code> + <code>covers/</code> al board.</p>';
+      return h+'<p class="nota">Aún no hay métricas confirmadas.</p>';
     }
     var posts=METRICS.posts.slice();
     var rec=posts.filter(function(p){return ageDays(p)<=30;});

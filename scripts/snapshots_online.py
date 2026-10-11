@@ -323,9 +323,11 @@ class Snapshots:
         while True:
             before, info = self._lock_info()
             busy = info and info["state"] == "held"
+            if busy and info["expires"] <= time.time():
+                busy = False
             if busy:
                 owner = self.api.request("actions/runs/" + str(info["run_id"]))
-                busy = owner["status"] != "completed" and info["expires"] > time.time()
+                busy = owner["status"] != "completed"
             if not busy:
                 payload = {"schema": SCHEMA, "state": "held", "run_id": self.run,
                            "attempt": self.attempt, "process": process,
@@ -630,6 +632,105 @@ class Snapshots:
                                  {"body": canonical(body).decode()}, method="PATCH")
         return self.output(publicado="si", snapshot_id=rid)
 
+    def publish_raw(self):
+        """Board: datos públicos separados del código de Pages, sin permiso admin."""
+        import base64
+        state = self.state()
+        self.assert_lease()
+        source = self.head()
+        if self.main() != source or source != state["source_sha"]:
+            raise OnlineError("El código cambió durante la medición")
+        rid = state.get("prepared_id") or state["parent_id"]
+        receipt = {"schema": SCHEMA, "code_sha": source, "data_sha": state["data_sha"],
+                   "snapshot_id": rid, "run_id": self.run}
+        if self.repo.endswith("/aurum-board"):
+            metric_file = self.root / "metrics.json"
+            if not metric_file.is_file():
+                raise OnlineError("Métricas públicas ausentes")
+            receipt["metrics_sha256"] = digest(metric_file.read_bytes())
+        ref = "heads/datos-online"
+        try:
+            before = self.api.request("git/ref/" + ref)["object"]["sha"]
+        except OnlineError as exc:
+            if str(exc) != "GitHub HTTP 404":
+                raise
+            before = None
+        base_tree = None
+        existing = {}
+        if before:
+            base_tree = self.api.request("git/commits/" + before)["tree"]["sha"]
+            entries = self.api.request("git/trees/" + base_tree + "?recursive=1")
+            if entries.get("truncated"):
+                raise OnlineError("Árbol de datos incompleto")
+            for entry in entries["tree"]:
+                if entry["type"] == "tree":
+                    continue
+                path = entry["path"]
+                if (entry["mode"] != "100644" or entry["type"] != "blob"
+                        or (path != "version-online.json" and not allowed(path, self.prefixes))):
+                    raise OnlineError("La rama de datos contiene código o un archivo no permitido")
+                existing[path] = entry["sha"]
+        files = {p: (self.root / p).read_bytes() for p in self.fingerprint()}
+        for path, data in files.items():
+            validate_file(path, data)
+        files["version-online.json"] = canonical(receipt) + b"\n"
+        tree = []
+        for path, data in sorted(files.items()):
+            blob_sha = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+            if existing.get(path) == blob_sha:
+                continue
+            blob = self.api.request("git/blobs", {
+                "encoding": "base64", "content": base64.b64encode(data).decode()})["sha"]
+            if blob != blob_sha:
+                raise OnlineError("GitHub no confirmó los bytes públicos")
+            tree.append({"path": path, "mode": "100644", "type": "blob", "sha": blob})
+        for path in set(existing) - set(files):
+            tree.append({"path": path, "mode": "100644", "type": "blob", "sha": None})
+        payload = {"tree": tree}
+        if base_tree:
+            payload["base_tree"] = base_tree
+        tree_sha = self.api.request("git/trees", payload)["sha"]
+        commit = self.api.request("git/commits", {
+            "message": "Datos públicos online " + self.run + " · " + state["data_sha"][:12],
+            "tree": tree_sha, "parents": [before] if before else []})["sha"]
+        self.assert_lease()
+        if self.main() != source:
+            raise OnlineError("main avanzó antes de publicar datos")
+        if before:
+            self.api.request("git/refs/" + ref, {"sha": commit, "force": False}, method="PATCH")
+        else:
+            self.api.request("git/refs", {"ref": "refs/" + ref, "sha": commit})
+        url = f"https://raw.githubusercontent.com/{self.repo}/datos-online/version-online.json"
+        deadline = self.clock() + 300
+        while self.clock() < deadline:
+            try:
+                req = urllib.request.Request(url + "?run=" + self.run,
+                                              headers={"Cache-Control": "no-cache"})
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    observed = json.loads(response.read(32768))
+                if receipt_matches(observed, code_sha=source, data_sha=state["data_sha"],
+                                   snapshot_id=rid, run_id=self.run):
+                    break
+            except (ValueError, OSError, urllib.error.URLError):
+                pass
+            self.sleep(5)
+        else:
+            raise OnlineError("La rama pública aún no acredita el recibo exacto")
+        self.assert_lease()
+        if self.api.request("git/ref/" + ref)["object"]["sha"] != commit:
+            raise OnlineError("La publicación de datos cambió concurrentemente")
+        if rid and state.get("prepared_id"):
+            release = self.api.request("releases/" + str(rid))
+            body = json.loads(release["body"])
+            self.validate_release(release, body)
+            body.update({"state": "published", "published_code_sha": source,
+                         "published_run": self.run, "confirmed_at": int(time.time()),
+                         "raw_commit": commit})
+            self.api.request("releases/" + str(rid), {"body": canonical(body).decode()}, method="PATCH")
+        state["published_receipt"] = receipt
+        self.save(state)
+        return self.output(publicado="si", data_commit=commit, snapshot_id=rid)
+
     def file_is_published(self, path):
         state = self.state()
         receipt = state.get("published_receipt")
@@ -664,7 +765,7 @@ class Snapshots:
 
 def cli():
     parser = argparse.ArgumentParser()
-    parser.add_argument("accion", choices=["bootstrap", "preparar", "publicar", "stage", "confirmar", "liberar", "bundle"])
+    parser.add_argument("accion", choices=["bootstrap", "preparar", "publicar", "stage", "confirmar", "liberar", "bundle", "publicar-raw"])
     parser.add_argument("--proceso")
     parser.add_argument("--lock", action="store_true")
     parser.add_argument("--sha")
@@ -683,6 +784,8 @@ def cli():
         value = s.stage(args.sha, args.snapshot_id, args.lease)
     elif args.accion == "confirmar":
         value = s.confirm()
+    elif args.accion == "publicar-raw":
+        value = s.publish_raw()
     elif args.accion == "bundle":
         value = s.build_site(args.destino)
     else:

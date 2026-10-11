@@ -1,16 +1,17 @@
 {
-  "model_revision": "2026-09-30.1",
-  "proposal_id": "CHG-ATLAS-001",
-  "summary": "Cumplir la lectura honesta del tablero: rechazos HTTP 200 y respuestas sin contrato no representan cero leads. Si un imán falla se conserva la atribución acreditada por publicación y pieza, y se señala la medición incompleta, incluso cuando todavía no existe atribución previa. No cambia el cálculo de conversiones, permisos ni endpoints. Se incorpora un diagnóstico manual de presencia de conexiones: GitHub evalúa booleanos y el proceso no recibe valores de secretos. No modifica credenciales, datos ni permisos.",
+  "model_revision": "2026-10-11.sala-online",
+  "proposal_id": "CHG-SALA-ONLINE-20261011",
+  "summary": "Mantener el código del board en Pages/main por PR y CI; actualizar métricas públicas y portadas desde rama exclusiva de datos con SHA256 y recibo exacto, usando identidad nativa y almacenamiento de versiones draft privado. Ante fallo el cliente conserva la última lectura. No se cambia la configuración de Pages ni el cálculo de atribuciones/leads.",
   "components": [
-    "SYS-MARKETING"
+    "SYS-MARKETING",
+    "EXT-ACTIONS"
   ],
   "tests": [
     "git diff --check",
-    "node --test tests/publicar-metricas.test.cjs",
-    "python3 -m unittest discover -s tests -p leads_metricas_test.py -v: rechazo HTTP 200, contrato ausente, vacío real, imán sin configuración, campañas válidas y fallo parcial con atribución previa; sin red.",
-    "Regresión previa reproducida en diagnóstico privado sobre c2a5ff4: rechazo leído como cero y atribución parcial que reemplaza la anterior.",
-    "Diagnóstico real 38133442115: indicadores de presencia ejecutados sin valores de secretos, sin llamadas comerciales ni escrituras."
+    "node --test tests/*.cjs",
+    "python3 -m unittest discover -s tests -p '*_test.py'",
+    "Prueba real 38138596609: draft privado y bytes recuperados; cambio de Pages rechazado HTTP403. No se fuerza ni se altera Administration.",
+    "Publicación real de rama de agregados y recibo pendiente de merge normal."
   ],
-  "rollback": "Revertir por PR el colector y sus pruebas; conservar métricas previas, portadas, formularios y registros del CRM. No borrar ni reiniciar históricos. El diagnóstico puede retirarse revirtiendo únicamente su workflow; no elimina ni rota las credenciales."
+  "rollback": "Revertir por PR el lector y el workflow, conservando métricas, portadas, ramas y snapshots. La publicación Git anterior exige resolver identidad/CI antes de habilitarla. No borrar atribuciones ni registros del CRM."
 }
