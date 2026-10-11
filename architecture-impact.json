@@ -1,5 +1,5 @@
 {
-  "model_revision": "2026-10-01.2",
+  "model_revision": "2026-10-11.c5-recovery-wait",
   "proposal_id": "CHG-PUBLICADORES-APP-001",
   "summary": "Crear los PR de métricas con un token de instalación de App separado, acotado al repositorio, y conservar Actions para push de rama, guard manual, checks obligatorios, merge protegido y Pages. Detectar no-op antes de acuñar el token y esperar rollups vacíos sin aprobarlos. Conserva la foto de métricas recuperada y la corrección de lectura honesta del colector integradas posteriormente.",
   "components": [
