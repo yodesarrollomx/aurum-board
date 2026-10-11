@@ -8,7 +8,7 @@
 #  - Los abortos controlados (pull vacio/degradado/lento) salen con codigo 0
 #    (no-op limpio) para no marcar la corrida como fallida ni mandar correos falsos;
 #    un token invalido si sale con error (eso si merece aviso).
-import sys, os, json, time, datetime, io, re, urllib.request, urllib.parse, urllib.error
+import sys, os, json, time, datetime, io, re, hashlib, urllib.request, urllib.parse, urllib.error
 from pathlib import Path
 try:
     from PIL import Image
@@ -27,8 +27,96 @@ BASE = str(Path(__file__).resolve().parents[1])
 # v25 de ese Apps Script existe recurso=leads con token de maquina, que devuelve
 # solo {fecha, utm_campaign, cita} — sin PII. El token entra por secreto porque
 # este repo es publico; sin el secreto, el iman simplemente no se consulta.
+PLAN_ONLINE_URL = "https://yodesarrollomx.github.io/sala-edicion/datos/plan-agregados.json"
+PLAN_RECEIPT_URL = "https://yodesarrollomx.github.io/sala-edicion/version-online.json"
+PLAN_STATE = None
+
+def _plan_json(url, max_bytes):
+    request = urllib.request.Request(url, headers={"Cache-Control": "no-cache"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        raw = response.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError("Plan excede contrato de lectura")
+    try:
+        payload = json.loads(raw)
+    except (ValueError, UnicodeError):
+        raise ValueError("Plan no entregó JSON válido") from None
+    if not isinstance(payload, dict):
+        raise ValueError("Plan no entregó contrato válido")
+    return raw, payload
+
+def fetch_plan_online(now=None):
+    """Recibo antes/después y hash; sólo conteos agregados, nunca credenciales."""
+    _, before = _plan_json(PLAN_RECEIPT_URL, 32768)
+    required = ("schema", "code_sha", "data_sha", "snapshot_id", "run_id", "plan_sha256")
+    if (type(before.get("schema")) is not int or before.get("schema") != 1
+            or not re.fullmatch(r"[0-9a-f]{40}", str(before.get("code_sha", "")))
+            or not re.fullmatch(r"[0-9a-f]{64}", str(before.get("data_sha", "")))
+            or not re.fullmatch(r"[0-9a-f]{64}", str(before.get("plan_sha256", "")))
+            or type(before.get("snapshot_id")) is not int or before["snapshot_id"] <= 0
+            or not re.fullmatch(r"[0-9]+", str(before.get("run_id", "")))):
+        raise ValueError("Plan sin recibo publicado completo")
+    raw, payload = _plan_json(PLAN_ONLINE_URL, 2 * 1024 * 1024)
+    if hashlib.sha256(raw).hexdigest() != before["plan_sha256"]:
+        raise ValueError("Plan no coincide con hash publicado")
+    _, after = _plan_json(PLAN_RECEIPT_URL, 32768)
+    if any(after.get(key) != before[key] for key in required):
+        raise ValueError("Plan cambió durante la lectura")
+    root_keys = {"schema", "fuente", "ok", "leido_en", "zona_horaria", "periodo",
+                 "completo", "conteos", "campanas"}
+    if (set(payload) != root_keys or type(payload.get("schema")) is not int or payload.get("schema") != 1
+            or payload.get("fuente") != "plan_potencial_sheet"
+            or payload.get("ok") is not True or payload.get("completo") is not True
+            or payload.get("periodo") != "historico"
+            or payload.get("zona_horaria") != "America/Hermosillo"):
+        raise ValueError("Plan sin contrato agregado completo")
+    try:
+        stamp = datetime.datetime.fromisoformat(str(payload["leido_en"]).replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            raise ValueError()
+        age = ((now or datetime.datetime.now(datetime.timezone.utc)) - stamp).total_seconds()
+    except (ValueError, TypeError):
+        raise ValueError("Plan sin fecha de lectura válida") from None
+    if not -300 <= age <= 3 * 3600:
+        raise ValueError("Plan fuera de ventana de actualización")
+    counts = payload["conteos"]
+    keys = {"leads_historicos", "citas_historicas_confirmadas", "leads_con_campana",
+            "sin_campana", "pruebas_excluidas", "duplicados_identicos"}
+    if (not isinstance(counts, dict) or set(counts) != keys
+            or any(type(value) is not int or not 0 <= value <= 50000 for value in counts.values())
+            or counts["leads_con_campana"] + counts["sin_campana"] != counts["leads_historicos"]
+            or counts["citas_historicas_confirmadas"] > counts["leads_historicos"]
+            or not isinstance(payload["campanas"], list) or len(payload["campanas"]) > 50000):
+        raise ValueError("Plan sin conteos reconciliados")
+    out, seen, lead_total, cita_total = [], set(), 0, 0
+    tag = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+    for row in payload["campanas"]:
+        if (not isinstance(row, dict) or set(row) != {"utm_campaign", "utm_content", "leads", "citas"}
+                or not isinstance(row["utm_campaign"], str) or not tag.fullmatch(row["utm_campaign"])
+                or not isinstance(row["utm_content"], str)
+                or (row["utm_content"] and not tag.fullmatch(row["utm_content"]))
+                or type(row["leads"]) is not int or not 1 <= row["leads"] <= 50000
+                or type(row["citas"]) is not int or not 0 <= row["citas"] <= row["leads"]):
+            raise ValueError("Plan con agregado fuera de contrato")
+        key = (row["utm_campaign"], row["utm_content"])
+        if key in seen:
+            raise ValueError("Plan con agregado duplicado")
+        seen.add(key)
+        lead_total += row["leads"]
+        cita_total += row["citas"]
+        # La tupla interna no puede aparecer en JSON remoto del otro imán.
+        out.append({"utm_campaign": row["utm_campaign"], "utm_content": row["utm_content"],
+                    "_online_counts": (row["leads"], row["citas"])})
+    if lead_total != counts["leads_con_campana"] or cita_total > counts["citas_historicas_confirmadas"]:
+        raise ValueError("Plan no concilia totales de campañas")
+    state = {"estado": "confirmada", "leido_en": payload["leido_en"], "periodo": "historico",
+             "conteos": counts, "snapshot_id": before["snapshot_id"], "run_id": str(before["run_id"]),
+             "plan_sha256": before["plan_sha256"]}
+    return out, state
+
+
 BOARD_URLS = {
-    "potencial": "https://script.google.com/macros/s/AKfycbw3EB-6Q9Mq-ouDU-JvKMrRUaw4auYVeGkKja783yJ7_dEpCOW8xoMhs8IQMDojmlDB3A/exec?recurso=board",
+    "potencial": PLAN_ONLINE_URL,
 }
 _QAA_TOKEN = os.environ.get("AURUM_QAA_TOKEN", "").strip()
 if _QAA_TOKEN:
@@ -73,21 +161,26 @@ def fetch_leads_utm():
     """Devuelve (leads, hubo_falla). El segundo valor importa: si un iman se cayo
     no podemos distinguir 'no hay leads' de 'no pude preguntar', y blanquear la
     atribucion por un timeout borraria leads ya ganados del board."""
+    global PLAN_STATE
+    PLAN_STATE = None
     out, falla = [], 'arquitectura' not in BOARD_URLS
     for nombre, url in BOARD_URLS.items():
-        u = url   # cada iman ya trae su recurso: board (abierto) o leads (con token)
+        u = url   # Plan: agregados con recibo; Arquitectura: contrato leads con token
         for intento in range(3):
             try:
-                req = urllib.request.Request(u, method="GET")
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    j = json.loads(r.read())
-                if not isinstance(j, dict) or j.get('ok') is False or j.get('error'):
-                    raise ValueError('el backend de leads rechazó la lectura')
-                if not isinstance(j.get('leads_utm'), list):
-                    raise ValueError('el backend no entregó el contrato leads_utm')
-                # se arma aparte y solo se suma al final: si algo truena a medio
-                # camino, el reintento no vuelve a contar lo que ya iba contado
-                parcial = [l for l in (j.get("leads_utm") or []) if l.get("utm_campaign")]
+                if nombre == "potencial" and u == PLAN_ONLINE_URL:
+                    parcial, state = fetch_plan_online()
+                    PLAN_STATE = state
+                else:
+                    req = urllib.request.Request(u, method="GET")
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        j = json.loads(r.read())
+                    if not isinstance(j, dict) or j.get('ok') is False or j.get('error'):
+                        raise ValueError('el backend de leads rechazó la lectura')
+                    if not isinstance(j.get('leads_utm'), list):
+                        raise ValueError('el backend no entregó el contrato leads_utm')
+                    parcial = [l for l in (j.get("leads_utm") or []) if l.get("utm_campaign")]
+                # Sólo sumar después de validar el imán completo: no duplicar por reintento.
                 out.extend(parcial)
                 break
             except Exception as e:
@@ -108,9 +201,14 @@ def leads_por_campana(leads_utm):
     agg = {}
     def suma(clave, l):
         agg.setdefault(clave, {"leads": 0, "citas": 0})
-        agg[clave]["leads"] += 1
-        if l.get("cita"):
-            agg[clave]["citas"] += 1
+        count = l.get("_online_counts")
+        if isinstance(count, tuple) and len(count) == 2:
+            agg[clave]["leads"] += count[0]
+            agg[clave]["citas"] += count[1]
+        else:
+            agg[clave]["leads"] += 1
+            if l.get("cita"):
+                agg[clave]["citas"] += 1
     for l in leads_utm:
         c = str(l.get("utm_campaign") or "").strip()
         if not c:
@@ -492,6 +590,8 @@ def main():
     # "cuentas" es la lista completa, que es lo que la galeria usa para filtrar.
     out = {"generado": stamp, "pagina": cuentas[0]["nombre"], "ig_id": cuentas[0]["ig_id"],
            "cuentas": [{"clave": c["clave"], "nombre": c["nombre"]} for c in cuentas], "posts": posts,
+           "plan_lectura": (PLAN_STATE or {**((prev_full or {}).get("plan_lectura") or {}),
+               "estado": "sin_lectura_confirmada"}),
            "leads_por_pieza": leads_por_pieza, "leads_medicion_caida": bool(leads_falla),
            "semana": semana, "dias_sin_publicar": dias_sin_publicar, "leads_utm_activo": leads_utm_activo}
     with open(os.path.join(BASE, "metrics.json"), "w") as f:
