@@ -1,0 +1,76 @@
+name: Comparar lecturas del publicador
+on:
+  push:
+    branches: [codex/sala-accesos-20261011]
+    paths: [.github/workflows/publicador-lecturas.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  token_actual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+
+    steps:
+      - name: Comparar consultas sin escribir en GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_PR: '73'
+          PROFILE: token_actual
+        run: |
+          node <<'NODE'
+          const {spawnSync}=require('node:child_process');
+          const repo=process.env.GITHUB_REPOSITORY, num=process.env.PROBE_PR;
+          function gh(args) {
+            const r=spawnSync('gh',args,{encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+            let data=null;try {data=JSON.parse(r.stdout||'');} catch {}
+            return {exit:r.status,empty:!(r.stdout||'').trim(),denied:/403|forbidden|resource not accessible/i.test(r.stderr||''),data};
+          }
+          const pr=gh(['api','repos/'+repo+'/pulls/'+num]);
+          const sha=pr.data?.head?.sha;
+          const a=gh(['pr','checks',num,'--repo',repo,'--required','--json','name,bucket,workflow']);
+          const b=gh(['pr','checks',num,'--repo',repo,'--json','name,bucket,workflow']);
+          const c=sha?gh(['api','repos/'+repo+'/commits/'+sha+'/check-runs']):null;
+          const d=sha?gh(['api','repos/'+repo+'/commits/'+sha+'/status']):null;
+          const reduce=x=>({exit:x.exit,empty:x.empty,denied:x.denied,checks:Array.isArray(x.data)?x.data.map(y=>({name:y.name,bucket:y.bucket,workflow:y.workflow})):null});
+          console.log(JSON.stringify({mode:'metadata_read_only',profile:process.env.PROFILE,pr:Number(num),sha,prRead:{exit:pr.exit,denied:pr.denied,mergeable:pr.data?.mergeable,mergeableState:pr.data?.mergeable_state},required:reduce(a),all:reduce(b),checkRuns:c?{exit:c.exit,denied:c.denied,total:c.data?.total_count,checks:c.data?.check_runs?.map(y=>({name:y.name,status:y.status,conclusion:y.conclusion,sha:y.head_sha}))}:null,statuses:d?{exit:d.exit,denied:d.denied,state:d.data?.state,count:d.data?.statuses?.length}:null}));
+          
+          NODE
+  token_con_lecturas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
+      statuses: read
+    steps:
+      - name: Comparar consultas sin escribir en GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROBE_PR: '73'
+          PROFILE: token_con_lecturas
+        run: |
+          node <<'NODE'
+          const {spawnSync}=require('node:child_process');
+          const repo=process.env.GITHUB_REPOSITORY, num=process.env.PROBE_PR;
+          function gh(args) {
+            const r=spawnSync('gh',args,{encoding:'utf8',timeout:60000,maxBuffer:2*1024*1024});
+            let data=null;try {data=JSON.parse(r.stdout||'');} catch {}
+            return {exit:r.status,empty:!(r.stdout||'').trim(),denied:/403|forbidden|resource not accessible/i.test(r.stderr||''),data};
+          }
+          const pr=gh(['api','repos/'+repo+'/pulls/'+num]);
+          const sha=pr.data?.head?.sha;
+          const a=gh(['pr','checks',num,'--repo',repo,'--required','--json','name,bucket,workflow']);
+          const b=gh(['pr','checks',num,'--repo',repo,'--json','name,bucket,workflow']);
+          const c=sha?gh(['api','repos/'+repo+'/commits/'+sha+'/check-runs']):null;
+          const d=sha?gh(['api','repos/'+repo+'/commits/'+sha+'/status']):null;
+          const reduce=x=>({exit:x.exit,empty:x.empty,denied:x.denied,checks:Array.isArray(x.data)?x.data.map(y=>({name:y.name,bucket:y.bucket,workflow:y.workflow})):null});
+          console.log(JSON.stringify({mode:'metadata_read_only',profile:process.env.PROFILE,pr:Number(num),sha,prRead:{exit:pr.exit,denied:pr.denied,mergeable:pr.data?.mergeable,mergeableState:pr.data?.mergeable_state},required:reduce(a),all:reduce(b),checkRuns:c?{exit:c.exit,denied:c.denied,total:c.data?.total_count,checks:c.data?.check_runs?.map(y=>({name:y.name,status:y.status,conclusion:y.conclusion,sha:y.head_sha}))}:null,statuses:d?{exit:d.exit,denied:d.denied,state:d.data?.state,count:d.data?.statuses?.length}:null}));
+          
+          NODE
