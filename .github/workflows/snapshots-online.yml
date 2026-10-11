@@ -1,0 +1,48 @@
+name: Validar snapshots online
+on:
+  push:
+    branches: [codex/sala-online-20261011]
+    paths:
+      - nube/snapshots_online.py
+      - nube/probar_snapshots.py
+      - scripts/snapshots_online.py
+      - scripts/probar_snapshots.py
+      - tests/snapshots_online_test.py
+      - .github/workflows/snapshots-online.yml
+  pull_request:
+    paths:
+      - nube/snapshots_online.py
+      - scripts/snapshots_online.py
+      - tests/snapshots_online_test.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contratos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m unittest discover -s tests -p snapshots_online_test.py -v
+      - run: git diff --check
+  capacidad:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Comprobar almacenamiento draft y modo de Pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/probar_snapshots.py
