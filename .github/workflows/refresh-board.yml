@@ -56,6 +56,17 @@ jobs:
             echo "::notice::Sin Secret YOD_META_TOKEN todavia; corrida no-op (agrega el token para activar)."
           fi
 
+      - name: Validar configuración de la App publicadora
+        if: steps.tok.outputs.hay == 'si'
+        env:
+          YOD_PUBLISHER_APP_ID: ${{ vars.YOD_PUBLISHER_APP_ID }}
+          YOD_PUBLISHER_APP_PRIVATE_KEY: ${{ secrets.YOD_PUBLISHER_APP_PRIVATE_KEY }}
+        run: |
+          if ! [[ "$YOD_PUBLISHER_APP_ID" =~ ^[0-9]+$ ]] || [ -z "$YOD_PUBLISHER_APP_PRIVATE_KEY" ]; then
+            echo "::error::Configura YOD_PUBLISHER_APP_ID y YOD_PUBLISHER_APP_PRIVATE_KEY antes de generar métricas."
+            exit 1
+          fi
+
       - name: Jalar metricas de FB/IG
         if: steps.tok.outputs.hay == 'si'
         env:
@@ -63,8 +74,25 @@ jobs:
           AURUM_QAA_TOKEN: ${{ secrets.AURUM_QAA_TOKEN }}   # iman Arquitectura de Autor
         run: python scripts/pull_metrics.py
 
-      - name: Proponer y validar la actualización
+      - name: Detectar cambios para publicar
+        id: cambios
         if: steps.tok.outputs.hay == 'si'
+        run: node scripts/publicar-metricas.cjs --check-changes >> "$GITHUB_OUTPUT"
+
+      - name: Crear token de la App sólo para abrir el PR
+        id: pr-token
+        if: steps.cambios.outputs.changed == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.YOD_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.YOD_PUBLISHER_APP_PRIVATE_KEY }}
+          repositories: ${{ github.repository }}
+          permission-contents: read
+          permission-pull-requests: write
+
+      - name: Proponer y validar la actualización
+        if: steps.cambios.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_CREATION_TOKEN: ${{ steps.pr-token.outputs.token }}
         run: node scripts/publicar-metricas.cjs
