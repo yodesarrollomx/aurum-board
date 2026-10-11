@@ -1,0 +1,43 @@
+name: Localizar conexiones de Sala y Marketing
+on:
+  push:
+    branches: [codex/sala-accesos-20261011]
+    paths: ['.github/workflows/sala-access-discovery.yml']
+permissions:
+  contents: read
+jobs:
+  descubrir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar nombres y formatos sin usar ni mostrar valores
+        env:
+          YOD_ACCESS_SECRETS: ${{ toJSON(secrets) }}
+          YOD_ACCESS_VARIABLES: ${{ toJSON(vars) }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const secrets=JSON.parse(process.env.YOD_ACCESS_SECRETS||'{}');
+          const vars=JSON.parse(process.env.YOD_ACCESS_VARIABLES||'{}');
+          const relevant=/SALA|GAS|SCRIPT|CLASP|GDRIVE|APP|PUBLISH|^GH_|GITHUB_PAT|YOD|QAA|POTENCIAL/i;
+          const names=Object.keys(secrets).filter(x=>relevant.test(x)).sort();
+          const report={at:new Date().toISOString(),mode:'read_only',businessWrites:0,secretNames:names,variableNames:Object.keys(vars).filter(x=>relevant.test(x)).sort(),credentialShapes:[],scriptCandidates:[]};
+          for(const name of names){
+           const value=secrets[name];let json;try{json=JSON.parse(value);}catch{}
+           report.credentialShapes.push({name,present:!!value,privateKey:/^-----BEGIN (RSA )?PRIVATE KEY-----/.test(value),numericId:/^\d+$/.test(value),jsonKeys:json&&typeof json==='object'&&!Array.isArray(json)?Object.keys(json).sort():null});
+          }
+          function scan(value,source,depth=0){
+           if(depth>5)return;
+           if(typeof value==='string'){
+            for(const m of value.matchAll(/script\.google\.com\/(?:home\/projects\/|d\/)([A-Za-z0-9_-]{20,200})/g))report.scriptCandidates.push({scriptId:m[1],source});
+            if(/(?:script_?id|scriptId)$/i.test(source.split('.').at(-1))&&/^[A-Za-z0-9_-]{30,200}$/.test(value)&&!value.startsWith('AKfy'))report.scriptCandidates.push({scriptId:value,source});
+            if(depth===0&&value.length<65536){try{scan(JSON.parse(value),source,depth+1);}catch{}}
+           }else if(value&&typeof value==='object')for(const[k,v]of Object.entries(value))scan(v,source+'.'+k,depth+1);
+          }
+          for(const[name,value]of Object.entries({...secrets,...vars}))if(/SCRIPT|GAS|CLASP|CONFIG|PROJECT/i.test(name))scan(value,name);
+          console.log(JSON.stringify(report));
+          
+          NODE
