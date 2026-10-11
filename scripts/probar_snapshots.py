@@ -30,7 +30,16 @@ def main():
         asset = s.api.upload(release, raw)
         back = s.api.asset(asset["id"])
         so.decode_archive(back, s.repo, s.prefixes, so.digest(raw), manifest["data_sha"])
+        body = {"schema": 1, "repo": s.repo, "kind": so.KIND, "state": "prepared",
+                "source_sha": s.head(), "parent_id": 0, "archive_sha256": so.digest(raw),
+                "data_sha": manifest["data_sha"], "asset_id": asset["id"],
+                "process": "metricas" if s.repo.endswith("/aurum-board") else "revision",
+                "run_id": s.run, "lease": "0" * 40}
+        s.api.request("releases/" + str(release["id"]),
+                      {"body": so.canonical(body).decode(), "draft": True,
+                       "tag_name": release["tag_name"]}, method="PATCH")
         check = s.api.request("releases/" + str(release["id"]))
+        s.validate_release(check, json.loads(check["body"]))
         assert check["draft"] is True
     finally:
         s.api.request("releases/" + str(release["id"]), method="DELETE")
